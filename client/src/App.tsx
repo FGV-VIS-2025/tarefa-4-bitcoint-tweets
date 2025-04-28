@@ -1,120 +1,91 @@
-import './App.css'
-import { useEffect, useRef, useState } from 'react'
-import * as d3 from 'd3'
+import "./App.css";
+import WordCloud from "./components/wordcloud";
+import Heatmap from "./components/heatmap";
+import { useState } from "react";
+import LineChart from "./components/line-chart";
 
-function App() {
-  // Usamos HTMLDivElement para especificar el tipo del elemento contenedor
-  const d3Container = useRef<HTMLDivElement>(null);
-  const [counter, setCounter] = useState(0);
-
-  useEffect(() => {
-    // Verificamos que el contenedor exista
-    if (d3Container.current) {
-
-      // Limpiar cualquier gráfico previo
-      d3.select(d3Container.current).selectAll('*').remove();
-      
-      // Configuración de dimensiones y márgenes
-      const margin = { top: 20, right: 30, bottom: 40, left: 50 };
-      const width = 600 - margin.left - margin.right;
-      const height = 400 - margin.top - margin.bottom;
-      
-      // Datos de ejemplo con interfaz tipada
-      interface DataItem {
-        name: string;
-        value: number;
-      }
-      
-      const data: DataItem[] = [
-        { name: 'Enero', value: 30 },
-        { name: 'Febrero', value: 45 },
-        { name: 'Marzo', value: 25 },
-        { name: 'Abril', value: 60 },
-        { name: 'Mayo', value: 40 },
-        { name: 'Junio', value: 80 }
-      ];
-      
-      // Crear el SVG con tipado seguro
-      const svg = d3.select(d3Container.current)
-        .append('svg')
-          .attr('width', width + margin.left + margin.right)
-          .attr('height', height + margin.top + margin.bottom)
-        .append('g')
-          .attr('transform', `translate(${margin.left},${margin.top})`);
-          
-      // Escala X con tipado explícito
-      const x = d3.scaleBand<string>()
-        .domain(data.map(d => d.name))
-        .range([0, width])
-        .padding(0.2);
-        
-      // Escala Y con tipado explícito
-      const y = d3.scaleLinear()
-        .domain([0, d3.max(data, d => d.value) || 0])
-        .nice()
-        .range([height, 0]);
-        
-      // Añadir eje X
-      svg.append('g')
-        .attr('transform', `translate(0,${height})`)
-        .call(d3.axisBottom(x))
-        .selectAll('text')
-          .attr('transform', 'translate(-10,0)rotate(-45)')
-          .style('text-anchor', 'end');
-          
-      // Añadir eje Y
-      svg.append('g')
-        .call(d3.axisLeft(y));
-        
-      // Añadir título Y
-      svg.append('text')
-        .attr('transform', 'rotate(-90)')
-        .attr('y', -margin.left + 20)
-        .attr('x', -height / 2)
-        .attr('text-anchor', 'middle')
-        .text('Valor');
-        
-      // Crear barras con tipado seguro
-      svg.selectAll<SVGRectElement, DataItem>('.bar')
-        .data(data)
-        .enter()
-        .append('rect')
-          .attr('class', 'bar')
-          .attr('x', d => x(d.name) || 0)
-          .attr('y', d => y(d.value))
-          .attr('width', x.bandwidth())
-          .attr('height', d => height - y(d.value))
-          .attr('fill', '#4682b4')
-          .on('mouseover', function() {
-            d3.select(this).attr('fill', '#1e5b94');
-          })
-          .on('mouseout', function() {
-            d3.select(this).attr('fill', '#4682b4');
-          });
-          
-      // Añadir etiquetas de valor con tipado seguro
-      svg.selectAll<SVGTextElement, DataItem>('.label')
-        .data(data)
-        .enter()
-        .append('text')
-          .attr('class', 'label')
-          .attr('x', d => (x(d.name) || 0) + x.bandwidth() / 2)
-          .attr('y', d => y(d.value) - 5)
-          .attr('text-anchor', 'middle')
-          .text(d => d.value);
-    }
-  }, []);
-  
-  return (
-    <div className="App">
-      <h1>Ejemplo de D3 nativo en React</h1>
-      <div className="d3-container" ref={d3Container} />
-
-      <button onClick={() => setCounter(
-        prevCounter => prevCounter + 1
-      )}>Value: {counter} Incrementar</button>
-    </div>
-  )
+// Definir la interfaz para los datos
+interface HashtagData {
+  fecha: string; // La fecha
+  hashtag: string; // El nombre del hashtag
+  cantidad: number; // La cantidad de incidencias
 }
 
-export default App
+function App() {
+  const [selectedFilter, setSelectedFilter] = useState("Contains");
+  const filters = [
+    { id: "starts-with", label: "Starts with" },
+    { id: "ends-with", label: "Ends with" },
+    { id: "contains", label: "Contains" },
+    { id: "exact-match", label: "Exact Match" },
+  ];
+
+  const handleFilterChange = (filterLabel: string) => {
+    setSelectedFilter(filterLabel);
+  };
+
+  const datosEjemplo: HashtagData[] = [
+    { fecha: "2024-01-01", hashtag: "#React", cantidad: 120 },
+    { fecha: "2024-02-01", hashtag: "#React", cantidad: 150 },
+    { fecha: "2024-03-01", hashtag: "#React", cantidad: 200 },
+    { fecha: "2024-04-01", hashtag: "#React", cantidad: 180 },
+    { fecha: "2024-05-01", hashtag: "#React", cantidad: 250 },
+    { fecha: "2024-01-01", hashtag: "#TypeScript", cantidad: 80 },
+    { fecha: "2024-02-01", hashtag: "#TypeScript", cantidad: 100 },
+    { fecha: "2024-03-01", hashtag: "#TypeScript", cantidad: 130 },
+    { fecha: "2024-04-01", hashtag: "#TypeScript", cantidad: 170 },
+    { fecha: "2024-05-01", hashtag: "#TypeScript", cantidad: 220 },
+    { fecha: "2024-01-01", hashtag: "#D3js", cantidad: 30 },
+    { fecha: "2024-02-01", hashtag: "#D3js", cantidad: 60 },
+    { fecha: "2024-03-01", hashtag: "#D3js", cantidad: 80 },
+    { fecha: "2024-04-01", hashtag: "#D3js", cantidad: 120 },
+    { fecha: "2024-05-01", hashtag: "#D3js", cantidad: 150 },
+  ];
+
+  return (
+    <div className="flex justify-center">
+      <div className="max-w-[1728px] w-full">
+        <h1 className="text-5xl text-center font-semibold">
+          Bitcoin Tweets Explorer
+        </h1>
+        <div className="grid grid-cols-12 h-[calc(100vh-80px)]">
+          <div className="col-span-8 rounded-lg h-[60vh]">
+            <LineChart datos={datosEjemplo} />
+          </div>
+          <div className="col-span-4 rounded-lg h-[60vh]">
+            {/** Filtering options */}
+            <div>
+              <input
+                type="text"
+                placeholder="Enter a hashtag or keyword"
+                className="w-full p-2 border rounded"
+              />
+              <div className="flex">
+                {filters.map((filter) => (
+                  <button
+                    key={filter.id}
+                    className={`px-4 py-2 text-sm font-medium border ${
+                      selectedFilter === filter.label
+                        ? "bg-gray-500 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                    onClick={() => handleFilterChange(filter.label)}
+                    aria-pressed={selectedFilter === filter.label}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <WordCloud />
+          </div>
+          <div className="col-span-12 rounded-lg h-[25vh]">
+            <Heatmap />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default App;
