@@ -4,9 +4,11 @@ import Heatmap from "./components/heatmap";
 import { useEffect, useState } from "react";
 import LineChart from "./components/line-chart";
 
+import hashtagCount from "../src/assets/hashtag-count.json";
+
 interface HashtagData {
   hashtag: string;
-  date: string;
+  date: Date;
   count: number;
 }
 
@@ -43,7 +45,17 @@ function App() {
 
   console.log("query value:", debouncedValue);
 
-  const datosEjemplo: HashtagData[] = [];
+  const datosEjemplo: HashtagData[] = (
+    hashtagCount as {
+      hashtag: string;
+      date: string;
+      count: number;
+    }[]
+  ).map((item) => ({
+    hashtag: item.hashtag,
+    date: new Date(item.date),
+    count: item.count,
+  })) as HashtagData[];
 
   return (
     <div className="flex justify-center">
@@ -60,7 +72,7 @@ function App() {
             <div className="grid grid-cols-12">
               <input
                 type="text"
-                placeholder="Enter a hashtag or keyword"
+                placeholder="Type a hashtag"
                 className="w-full p-2 border rounded col-span-4"
                 value={inputValue}
                 onChange={handleInputChange}
@@ -85,7 +97,7 @@ function App() {
             <WordCloud />
           </div>
           <div className="col-span-12 rounded-lg h-[25vh]">
-            <Heatmap />
+            <Heatmap initialData={datosEjemplo} />
           </div>
         </div>
       </div>

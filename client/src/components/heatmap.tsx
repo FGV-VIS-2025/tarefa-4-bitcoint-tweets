@@ -1,12 +1,17 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 
-interface CommitData {
+interface HashtagData {
+  hashtag: string;
   date: Date;
   count: number;
 }
 
-export default function GitHubHeatmap() {
+type HeatMapProps = {
+  initialData: HashtagData[];
+};
+
+export default function HeatMap({ initialData }: HeatMapProps) {
   const d3Container = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -15,7 +20,7 @@ export default function GitHubHeatmap() {
       d3.select(d3Container.current).selectAll("*").remove();
 
       // Generate data for a full year
-      const data: CommitData[] = generateCommitData();
+      const data: HashtagData[] = initialData;
 
       // Get container dimensions
       const containerWidth = d3Container.current.clientWidth;
@@ -241,57 +246,6 @@ export default function GitHubHeatmap() {
       };
     }
   }, []);
-
-  // Function to generate fake commit data for a year
-  function generateCommitData(): CommitData[] {
-    const currentDate = new Date();
-    const startDate = new Date(currentDate);
-    startDate.setFullYear(currentDate.getFullYear() - 1);
-
-    // Set to beginning of the week (Monday)
-    const dayOfWeek = startDate.getDay();
-    startDate.setDate(
-      startDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)
-    );
-
-    const result: CommitData[] = [];
-
-    // Generate a full year of data plus a few extra weeks
-    for (let i = 0; i < 53 * 7; i++) {
-      const date = new Date(startDate);
-      date.setDate(date.getDate() + i);
-
-      // Generate more commits for certain days (patterns)
-      let count = 0;
-
-      // Basic random pattern (more commits on weekdays, fewer on weekends)
-      const dayOfWeek = date.getDay();
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
-      if (isWeekend) {
-        count = Math.random() < 0.7 ? 0 : Math.floor(Math.random() * 3);
-      } else {
-        // Higher probability of commits on weekdays
-        count = Math.random() < 0.3 ? 0 : Math.floor(Math.random() * 7 + 1);
-      }
-
-      // Simulate project bursts in specific months
-      const month = date.getMonth();
-      if (month === 2 || month === 7) {
-        // March and August
-        count = Math.max(count, Math.floor(Math.random() * 10));
-      }
-
-      // Add occasional "intense coding" days
-      if (Math.random() < 0.05) {
-        count = Math.floor(Math.random() * 15) + 5; // 5-20 commits
-      }
-
-      result.push({ date, count });
-    }
-
-    return result;
-  }
 
   // Function to create initial chart and update on resize
   function renderChart() {

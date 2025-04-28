@@ -3,7 +3,7 @@ import * as d3 from "d3";
 
 interface HashtagData {
   hashtag: string;
-  date: string;
+  date: Date;
   count: number;
 }
 
@@ -43,7 +43,7 @@ const LineChart: React.FC<LineChartProps> = ({ data }) => {
     }));
 
     // Crear escala X (tiempo)
-    const fechas = data.map((d) => new Date(d.fecha));
+    const fechas = data.map((d) => new Date(d.date));
     const x = d3
       .scaleTime()
       .domain(d3.extent(fechas) as [Date, Date])
@@ -58,7 +58,7 @@ const LineChart: React.FC<LineChartProps> = ({ data }) => {
     // Añadir eje Y
     const y = d3
       .scaleLinear()
-      .domain([0, d3.max(data, (d) => d.cantidad) || 0])
+      .domain([0, d3.max(data, (d) => d.count) || 0])
       .range([height, 0]);
 
     svg.append("g").call(d3.axisLeft(y));
@@ -91,33 +91,9 @@ const LineChart: React.FC<LineChartProps> = ({ data }) => {
       .attr("d", (d) => {
         return d3
           .line<HashtagData>()
-          .x((d) => x(new Date(d.fecha)))
-          .y((d) => y(d.cantidad))(d.values);
+          .x((d) => x(new Date(d.date)))
+          .y((d) => y(d.count))(d.values);
       });
-
-    // Añadir leyenda
-    const legend = svg
-      .selectAll(".legend")
-      .data(hashtags)
-      .enter()
-      .append("g")
-      .attr("class", "legend")
-      .attr("transform", (d, i) => `translate(0,${i * 20})`);
-
-    legend
-      .append("rect")
-      .attr("x", width - 18)
-      .attr("width", 18)
-      .attr("height", 18)
-      .style("fill", (d) => color(d));
-
-    legend
-      .append("text")
-      .attr("x", width - 24)
-      .attr("y", 9)
-      .attr("dy", ".35em")
-      .style("text-anchor", "end")
-      .text((d) => d);
   }, [data]);
 
   return (
