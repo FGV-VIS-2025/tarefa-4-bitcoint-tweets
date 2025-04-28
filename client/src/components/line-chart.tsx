@@ -1,23 +1,21 @@
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
 
-// Definir la interfaz para los datos
 interface HashtagData {
-  fecha: string; // La fecha
-  hashtag: string; // El nombre del hashtag
-  cantidad: number; // La cantidad de incidencias
+  hashtag: string;
+  date: string;
+  count: number;
 }
 
-// Props del componente
 interface LineChartProps {
-  datos: HashtagData[];
+  data: HashtagData[];
 }
 
-const LineChart: React.FC<LineChartProps> = ({ datos }) => {
+const LineChart: React.FC<LineChartProps> = ({ data }) => {
   const chartRef = useRef<SVGSVGElement | null>(null);
 
   useEffect(() => {
-    if (!datos || datos.length === 0 || !chartRef.current) return;
+    if (!data || data.length === 0 || !chartRef.current) return;
 
     // Limpiar gráfico anterior si existe
     d3.select(chartRef.current).selectAll("*").remove();
@@ -35,8 +33,8 @@ const LineChart: React.FC<LineChartProps> = ({ datos }) => {
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // Agrupar los datos por hashtag
-    const hashtagsAgrupados = d3.group(datos, (d) => d.hashtag);
+    // Agrupar los data por hashtag
+    const hashtagsAgrupados = d3.group(data, (d) => d.hashtag);
 
     // Convertir Map a Array para compatibilidad con la visualización
     const sumstat = Array.from(hashtagsAgrupados, ([key, values]) => ({
@@ -45,7 +43,7 @@ const LineChart: React.FC<LineChartProps> = ({ datos }) => {
     }));
 
     // Crear escala X (tiempo)
-    const fechas = datos.map((d) => new Date(d.fecha));
+    const fechas = data.map((d) => new Date(d.fecha));
     const x = d3
       .scaleTime()
       .domain(d3.extent(fechas) as [Date, Date])
@@ -60,13 +58,13 @@ const LineChart: React.FC<LineChartProps> = ({ datos }) => {
     // Añadir eje Y
     const y = d3
       .scaleLinear()
-      .domain([0, d3.max(datos, (d) => d.cantidad) || 0])
+      .domain([0, d3.max(data, (d) => d.cantidad) || 0])
       .range([height, 0]);
 
     svg.append("g").call(d3.axisLeft(y));
 
     // Paleta de colores
-    const hashtags = Array.from(new Set(datos.map((d) => d.hashtag)));
+    const hashtags = Array.from(new Set(data.map((d) => d.hashtag)));
     const color = d3
       .scaleOrdinal<string>()
       .domain(hashtags)
@@ -120,7 +118,7 @@ const LineChart: React.FC<LineChartProps> = ({ datos }) => {
       .attr("dy", ".35em")
       .style("text-anchor", "end")
       .text((d) => d);
-  }, [datos]);
+  }, [data]);
 
   return (
     <div className="w-full h-full">
