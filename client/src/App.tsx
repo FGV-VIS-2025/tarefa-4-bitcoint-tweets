@@ -1,7 +1,7 @@
 import "./App.css";
 import WordCloud from "./components/wordcloud";
 import Heatmap from "./components/heatmap";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import LineChart from "./components/line-chart";
 
 import hashtagCount from "../src/assets/hashtag-count.json";
@@ -13,7 +13,7 @@ interface HashtagData {
 }
 
 function App() {
-  const [selectedFilter, setSelectedFilter] = useState("Contains");
+  const [selectedFilter, setSelectedFilter] = useState("contains");
   const [inputValue, setInputValue] = useState("");
   const [debouncedValue, setDebouncedValue] = useState("");
 
@@ -23,7 +23,9 @@ function App() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedValue(inputValue);
+      setDebouncedValue((prev) =>
+        prev !== inputValue.trim() ? inputValue.trim() : prev
+      );
     }, 200); // delay
 
     // Clear timeout if input value changes within the delay period
@@ -43,19 +45,44 @@ function App() {
     setSelectedFilter(filterLabel);
   };
 
-  console.log("query value:", debouncedValue);
+  const fullData: HashtagData[] = useMemo(
+    () =>
+      (
+        hashtagCount as {
+          hashtag: string;
+          date: string;
+          count: number;
+        }[]
+      ).map((item) => ({
+        hashtag: item.hashtag,
+        date: new Date(item.date),
+        count: item.count,
+      })) as HashtagData[],
+    []
+  );
 
-  const datosEjemplo: HashtagData[] = (
-    hashtagCount as {
-      hashtag: string;
-      date: string;
-      count: number;
-    }[]
-  ).map((item) => ({
-    hashtag: item.hashtag,
-    date: new Date(item.date),
-    count: item.count,
-  })) as HashtagData[];
+  const filteredData = useMemo(() => {
+    if (debouncedValue.length === 0) return fullData;
+
+    const filtered = fullData.filter((item) => {
+      const hashtag = item.hashtag.toLowerCase();
+      const query = debouncedValue.toLowerCase();
+
+      switch (selectedFilter) {
+        case "starts-with":
+          return hashtag.startsWith(query);
+        case "ends-with":
+          return hashtag.endsWith(query);
+        case "contains":
+          return hashtag.includes(query);
+        case "exact-match":
+          return hashtag === query;
+        default:
+          return true;
+      }
+    });
+    return filtered;
+  }, [debouncedValue, selectedFilter, fullData]);
 
   return (
     <div className="flex justify-center">
@@ -65,7 +92,7 @@ function App() {
         </h1>
         <div className="grid grid-cols-12 h-[calc(100vh-80px)]">
           <div className="col-span-8 rounded-lg h-[60vh]">
-            <LineChart data={datosEjemplo} />
+            <LineChart data={filteredData} />
           </div>
           <div className="col-span-4 rounded-lg h-[60vh]">
             {/** Filtering options */}
@@ -97,7 +124,7 @@ function App() {
             <WordCloud />
           </div>
           <div className="col-span-12 rounded-lg h-[25vh]">
-            <Heatmap initialData={datosEjemplo} />
+            <Heatmap initialData={filteredData} />
           </div>
         </div>
       </div>

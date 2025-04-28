@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 
 interface HashtagData {
@@ -13,23 +13,59 @@ interface LineChartProps {
 
 const LineChart: React.FC<LineChartProps> = ({ data }) => {
   const chartRef = useRef<SVGSVGElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
+  // Función para obtener las dimensiones del contenedor padre
+  const updateDimensions = () => {
+    if (containerRef.current) {
+      const { width, height } = containerRef.current.getBoundingClientRect();
+      setDimensions({ width, height });
+    }
+  };
+
+  // Efecto para manejar el resize y obtener dimensiones iniciales
   useEffect(() => {
-    if (!data || data.length === 0 || !chartRef.current) return;
+    updateDimensions();
+
+    const resizeObserver = new ResizeObserver(updateDimensions);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    // Cleanup
+    return () => {
+      if (containerRef.current) {
+        resizeObserver.unobserve(containerRef.current);
+      }
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Efecto para dibujar el gráfico
+  useEffect(() => {
+    if (
+      !data ||
+      data.length === 0 ||
+      !chartRef.current ||
+      dimensions.width === 0 ||
+      dimensions.height === 0
+    )
+      return;
 
     // Limpiar gráfico anterior si existe
     d3.select(chartRef.current).selectAll("*").remove();
 
     // Configurar márgenes y dimensiones
     const margin = { top: 10, right: 30, bottom: 30, left: 60 };
-    const width = 460 - margin.left - margin.right;
-    const height = 400 - margin.top - margin.bottom;
+    const width = dimensions.width - margin.left - margin.right;
+    const height = dimensions.height - margin.top - margin.bottom;
 
     // Crear el contenedor SVG
     const svg = d3
       .select(chartRef.current)
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
+      .attr("width", dimensions.width)
+      .attr("height", dimensions.height)
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -94,11 +130,11 @@ const LineChart: React.FC<LineChartProps> = ({ data }) => {
           .x((d) => x(new Date(d.date)))
           .y((d) => y(d.count))(d.values);
       });
-  }, [data]);
+  }, [data, dimensions]);
 
   return (
-    <div className="w-full h-full">
-      <svg ref={chartRef}></svg>
+    <div ref={containerRef} className="w-full h-full">
+      <svg ref={chartRef} width="100%" height="100%"></svg>
     </div>
   );
 };
