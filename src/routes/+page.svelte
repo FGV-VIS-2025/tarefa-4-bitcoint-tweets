@@ -52,12 +52,14 @@
     <div class="py-10 flex flex-col items-center w-full">
       <div class="max-w-4xl space-y-8">
         <div>
-          <h1 class="text-6xl font-bold text-[#ff9900] text-center">Bitcoin Tweets Explorer</h1>
-        <p class="text-lg text-center">
-          Welcome to the Bitcoin Tweets Explorer! This is a simple app that
-          allows you to explore tweets about Bitcoin. You can search for tweets
-          by keyword, and view the results in a list.
-        </p>
+          <h1 class="text-6xl font-bold text-[#ff9900] text-center">
+            Bitcoin Tweets Explorer
+          </h1>
+          <p class="text-lg text-center">
+            This is a simple web app that allows you to explore Bitcoin-related
+            tweets. You can search for specific hashtags and view their trends
+            over time.
+          </p>
         </div>
         <SearchFilter on:search={handleSearch} />
       </div>
