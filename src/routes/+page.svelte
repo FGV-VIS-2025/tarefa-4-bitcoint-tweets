@@ -27,6 +27,11 @@
     searchQuery = query;
     searchFilterType = filterType;
 
+    if (!query) {
+      filteredData = hashtagData;
+      return;
+    }
+
     // Here you could also trigger an actual search operation
     filteredData = hashtagData.filter((item) => {
       const hashtag = item.hashtag.toLowerCase();
