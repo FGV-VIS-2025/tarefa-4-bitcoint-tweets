@@ -1,0 +1,11 @@
+
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("../fonts/InstrumentSans-VariableFont_wdth\,wght.ttf") format("truetype");
+}
+
+* {
+  font-family: "Instrument Sans", sans-serif;
+  margin: 0;
+  padding: 0;
+}
