@@ -4,9 +4,9 @@
 
   // Props
   export let filters = [
+    { id: "contains", label: "Contains" },
     { id: "starts-with", label: "Starts with" },
     { id: "ends-with", label: "Ends with" },
-    { id: "contains", label: "Contains" },
     { id: "exact-match", label: "Exact Match" },
   ];
 

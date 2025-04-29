@@ -15,7 +15,7 @@
   }
 
   export let initialData: HashtagData[] = [];
-  export let title: string = "Tweet Activity Heatmap";
+  export let title: string = "Tweet Activity over the Year";
 
   let d3Container: HTMLDivElement;
 
@@ -43,8 +43,8 @@
     }
 
     // Get container dimensions
-    const containerWidth = d3Container.clientWidth || 800; // Default width if container has no width
-    const containerHeight = d3Container.clientHeight || 240; // Increased height to accommodate legend
+    const containerWidth = d3Container.clientWidth || 800;
+    const containerHeight = d3Container.clientHeight || 320;
 
     // Set dimensions and margins
     const cellSize = Math.floor(containerWidth / 55); // Adapt cell size to container width
@@ -76,7 +76,7 @@
       .attr("x", (containerWidth - margin.left - margin.right) / 2)
       .attr("y", -20)
       .attr("text-anchor", "middle")
-      .style("font-size", "16px")
+      .style("font-size", "20px")
       .style("font-weight", "bold")
       .style("fill", "#333333")
       .text(title);
@@ -111,7 +111,7 @@
       .enter()
       .append("text")
       .attr("class", "month")
-      .style("font-size", `${Math.max(9, cellSize * 0.65)}px`)
+      .style("font-size", `${Math.max(9, cellSize * 0.45)}px`)
       .style("fill", "#666666") // Dark gray for light mode
       .attr("x", (d) => {
         // Calculate the week number from the start date
@@ -142,7 +142,7 @@
       });
 
     // Add day of week labels - all days of the week
-    const days = ["S", "M", "T", "W", "T", "F", "S"];
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
     svg
       .selectAll(".day")
@@ -150,7 +150,8 @@
       .enter()
       .append("text")
       .attr("class", "day")
-      .style("font-size", `${Math.max(9, cellSize * 0.6)}px`)
+      .style("font-size", `${Math.max(9, cellSize * 0.35)}px`)
+      .style("font-weight", "500")
       .style("fill", "#666666")
       .attr("x", -25)
       .attr("y", (d, i) => i * fullCellSize + fullCellSize / 2 + 3) // Centered with the cell
@@ -229,7 +230,7 @@
     const legendHeight = 15;
     const legendX =
       (containerWidth - margin.left - margin.right - legendWidth) / 2;
-    const legendY = containerHeight - margin.top - margin.bottom + 10;
+    const legendY = containerHeight - margin.top - margin.bottom + 40;
 
     // Create gradient for legend
     const defs = svg.append("defs");
@@ -267,27 +268,18 @@
       .attr("x", legendX)
       .attr("y", legendY - 5)
       .style("text-anchor", "start")
-      .style("font-size", "10px")
+      .style("font-size", "12px")
       .style("fill", "#666666")
-      .text("Less");
+      .text(0);
 
     svg
       .append("text")
       .attr("x", legendX + legendWidth)
       .attr("y", legendY - 5)
       .style("text-anchor", "end")
-      .style("font-size", "10px")
+      .style("font-size", "12px")
       .style("fill", "#666666")
-      .text("More");
-
-    svg
-      .append("text")
-      .attr("x", legendX + legendWidth / 2)
-      .attr("y", legendY + legendHeight + 15)
-      .style("text-anchor", "middle")
-      .style("font-size", "10px")
-      .style("fill", "#666666")
-      .text("Tweet Activity");
+      .text(maxCount);
   }
 
   // Use Svelte's reactive statements to update the chart when data changes

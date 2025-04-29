@@ -6,7 +6,6 @@
 
   import hashtagDataJson from "$lib/data/hashtag-count.json";
   import wordcloudData from "$lib/data/wordcloud-data.json";
-  import { filter } from "d3";
 
   const hashtagData = hashtagDataJson.map((item) => ({
     ...item,
@@ -49,20 +48,26 @@
 </script>
 
 <main class="flex justify-center">
-  <div class="max-w-7xl w-full">
-    <h1 class="text-6xl font-bold">Bitcoin Tweets Explorer</h1>
-    <p class="text-lg">
-      Welcome to the Bitcoin Tweets Explorer! This is a simple app that allows
-      you to explore tweets about Bitcoin. You can search for tweets by keyword,
-      and view the results in a list.
-    </p>
+  <div class="max-w-[1728px] w-full">
+    <div class="py-10 flex flex-col items-center w-full">
+      <div class="max-w-4xl space-y-8">
+        <div>
+          <h1 class="text-6xl font-bold text-[#ff9900] text-center">Bitcoin Tweets Explorer</h1>
+        <p class="text-lg text-center">
+          Welcome to the Bitcoin Tweets Explorer! This is a simple app that
+          allows you to explore tweets about Bitcoin. You can search for tweets
+          by keyword, and view the results in a list.
+        </p>
+        </div>
+        <SearchFilter on:search={handleSearch} />
+      </div>
+    </div>
 
     <div class="grid grid-cols-12">
       <div class="col-span-8">
         <LineChart data={filteredData} />
       </div>
       <div class="col-span-4">
-        <SearchFilter on:search={handleSearch} />
         <WordCloud words={wordcloudData} fontSizeScale={80} />
       </div>
 
