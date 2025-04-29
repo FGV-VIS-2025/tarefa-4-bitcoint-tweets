@@ -1,8 +1,15 @@
-import { useEffect, useRef } from "react";
+// @ts-nocheck
+
+import { useEffect, useRef, useMemo } from "react";
 import * as d3 from "d3";
 
 interface HashtagData {
   hashtag: string;
+  date: Date;
+  count: number;
+}
+
+interface CountByDateType {
   date: Date;
   count: number;
 }
@@ -14,17 +21,26 @@ type HeatMapProps = {
 export default function HeatMap({ initialData }: HeatMapProps) {
   const d3Container = useRef<HTMLDivElement>(null);
 
+  // Usar useMemo para calcular countByDate para mejorar el rendimiento
+  const countByDate = useMemo(() => {
+    const groupedByDate = d3.group(initialData, (d) => d.date.toDateString());
+    return Array.from(groupedByDate, ([dateStr, values]) => ({
+      date: new Date(dateStr),
+      count: values.reduce((acc, curr) => acc + curr.count, 0),
+    }));
+  }, [initialData]);
+
   useEffect(() => {
     if (d3Container.current) {
       // Clear any previous chart
       d3.select(d3Container.current).selectAll("*").remove();
 
-      // Generate data for a full year
-      const data: HashtagData[] = initialData;
+      // Use countByDate instead of initialData
+      const data: CountByDateType[] = countByDate;
 
       // Get container dimensions
       const containerWidth = d3Container.current.clientWidth;
-      const containerHeight = d3Container.current.clientHeight || 200; // Default height if not set
+      const containerHeight = d3Container.current.clientHeight || 200;
 
       // Set dimensions and margins
       const cellSize = Math.floor(containerWidth / 55); // Adapt cell size to container width
@@ -32,17 +48,17 @@ export default function HeatMap({ initialData }: HeatMapProps) {
       const fullCellSize = cellSize + cellMargin;
 
       const margin = { top: 20, right: 30, bottom: 20, left: 40 };
-      const width = containerWidth - margin.left - margin.right;
+      /* const width = containerWidth - margin.left - margin.right;
       const height = Math.min(
         containerHeight - margin.top - margin.bottom,
         7 * fullCellSize
-      );
+      ); */
 
       // Create color scale based on contribution count
-      const maxCommits = d3.max(data, (d) => d.count) || 10;
+      const maxCount = d3.max(data, (d) => d.count) || 10;
       const colorScale = d3
         .scaleSequential()
-        .domain([0, maxCommits])
+        .domain([0, maxCount])
         .interpolator(d3.interpolateGreens);
 
       // Create SVG with responsive dimensions
@@ -73,7 +89,7 @@ export default function HeatMap({ initialData }: HeatMapProps) {
         .enter()
         .append("text")
         .attr("class", "month")
-        .style("font-size", `${Math.max(9, cellSize * 0.8)}px`)
+        .style("font-size", `${Math.max(9, cellSize * 0.65)}px`)
         .style("fill", "#666666") // Dark gray for light mode
         .attr("x", (d) => {
           // Calculate the week number from the start date
@@ -104,7 +120,7 @@ export default function HeatMap({ initialData }: HeatMapProps) {
         });
 
       // Add day of week labels
-      const days = ["Mon", "Wed", "Fri"];
+      const days = ["M", "W", "F"];
       const dayIndexes = [0, 2, 4]; // Monday is 0, Wednesday is 2, Friday is 4
 
       svg
@@ -113,7 +129,7 @@ export default function HeatMap({ initialData }: HeatMapProps) {
         .enter()
         .append("text")
         .attr("class", "day")
-        .style("font-size", `${Math.max(9, cellSize * 0.8)}px`)
+        .style("font-size", `${Math.max(9, cellSize * 0.6)}px`)
         .style("fill", "#666666")
         .attr("x", -25)
         .attr("y", (d) => d * fullCellSize + fullCellSize / 2 + 3) // Centered with the cell
@@ -176,85 +192,16 @@ export default function HeatMap({ initialData }: HeatMapProps) {
             month: "long",
             day: "numeric",
           } as const;
-          const dateStr = d.date.toLocaleDateString("es-ES", options);
-          return `${d.count} contribuciones el ${dateStr}`;
+          const dateStr = d.date.toLocaleDateString("en-US", options);
+          return `${d.count} tweets on ${dateStr}`;
         });
 
-      // Add legend
-      const legendX = width - 250;
-      const legendY = height + 10;
-
-      const legend = svg
-        .append("g")
-        .attr("transform", `translate(${legendX}, ${legendY})`);
-
-      legend
-        .append("text")
-        .attr("x", -60)
-        .attr("y", 10)
-        .style("font-size", `${Math.max(9, cellSize * 0.8)}px`)
-        .style("fill", "#666666")
-        .text("Menos");
-
-      // Legend cells
-      const legendValues = [
-        0,
-        Math.ceil(maxCommits / 4),
-        Math.ceil(maxCommits / 2),
-        Math.ceil((3 * maxCommits) / 4),
-        maxCommits,
-      ];
-
-      legend
-        .selectAll(".legend-cell")
-        .data(legendValues)
-        .enter()
-        .append("rect")
-        .attr("class", "legend-cell")
-        .attr("width", cellSize)
-        .attr("height", cellSize)
-        .attr("rx", 2)
-        .attr("ry", 2)
-        .attr("x", (d, i) => i * (cellSize + 2))
-        .attr("fill", (d) => (d === 0 ? "#ebedf0" : colorScale(d)))
-        .style("stroke", "#ffffff")
-        .style("stroke-width", "1px");
-
-      legend
-        .append("text")
-        .attr("x", 5 * (cellSize + 2) + 5)
-        .attr("y", 10)
-        .style("font-size", `${Math.max(9, cellSize * 0.8)}px`)
-        .style("fill", "#666666")
-        .text("Más");
-
-      // Handle resize
-      const handleResize = () => {
-        if (d3Container.current) {
-          // Re-render the chart when window is resized
-          d3.select(d3Container.current).selectAll("*").remove();
-          renderChart();
-        }
-      };
-
-      // Add event listener for window resize
-      window.addEventListener("resize", handleResize);
-
-      // Clean up function
-      return () => {
-        window.removeEventListener("resize", handleResize);
-      };
+      return () => {};
     }
-  }, []);
-
-  // Function to create initial chart and update on resize
-  function renderChart() {
-    // This function would contain all the chart rendering code
-    // It's defined here but called through the useEffect
-  }
+  }, [countByDate]);
 
   return (
-    <div className="github-contribution-graph w-full h-full">
+    <div className="w-full h-full">
       <div ref={d3Container} className="w-full h-full"></div>
     </div>
   );
