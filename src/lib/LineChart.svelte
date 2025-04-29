@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, afterUpdate } from 'svelte';
+  import { onMount } from 'svelte';
   import * as d3 from 'd3';
   
   // Interfaces
@@ -11,61 +11,75 @@
   
   // Props
   export let data: HashtagData[] = [];
+  export let chartTitle: string = "Hashtag Trends Over Time";
+  export let xAxisLabel: string = "Months of the Year 2022";
+  export let yAxisLabel: string = "Number of Tweets";
   
   let chartElement: SVGSVGElement;
   let containerElement: HTMLDivElement;
   let dimensions = { width: 0, height: 0 };
   let tooltip;
   
-  // Reactive statement para agrupar los datos
+  // Group data by hashtag
   $: hashtagsGrouped = groupData(data);
   
   function groupData(inputData: HashtagData[]) {
     if (!inputData || inputData.length === 0) return [];
     
-    // Agrupar datos por hashtag
     const grouped = d3.group(inputData, d => d.hashtag);
-    
-    // Convertir Map a Array para compatibilidad con visualización
     return Array.from(grouped, ([key, values]) => ({
       key,
       values
     }));
   }
   
-  // Reactive statement para escalas y dominios
+  // Generate a deterministic color for a hashtag using string hashing
+  function hashStringToColor(str: string) {
+    // Simple string hash function
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    // Convert hash to RGB values with good color separation
+    // Using HSL for better visual distinction
+    const h = Math.abs(hash % 360);
+    const s = 70 + Math.abs((hash >> 8) % 30); // 70-100% saturation
+    const l = 35 + Math.abs((hash >> 16) % 30); // 35-65% lightness
+    
+    return `hsl(${h}, ${s}%, ${l}%)`;
+  }
+  
+  // Calculate scales and domains
   $: scales = calculateScales(data, dimensions);
   
   function calculateScales(inputData: HashtagData[], dims) {
     if (!inputData || inputData.length === 0 || dims.width === 0 || dims.height === 0) {
-      return { xScale: null, yScale: null, colorScale: null, margin: null };
+      return { xScale: null, yScale: null, margin: null };
     }
     
-    const margin = { top: 10, right: 30, bottom: 30, left: 60 };
+    // Define margins with more space for title and legend
+    const margin = { top: 40, right: 120, bottom: 50, left: 70 };
     const width = dims.width - margin.left - margin.right;
     const height = dims.height - margin.top - margin.bottom;
     
-    // Extraer fechas y crear escala de tiempo
-    const dates = inputData.map(d => new Date(d.date));
+    // Get year from data
+    const year = inputData.length > 0 ? new Date(inputData[0].date).getFullYear() : 2022;
+    
+    // Create time scale for x-axis with all months visible
+    const startDate = new Date(year, 0, 1); // January 1st
+    const endDate = new Date(year, 11, 31); // December 31st
+    
     const xScale = d3.scaleTime()
-      .domain(d3.extent(dates) as [Date, Date])
+      .domain([startDate, endDate])
       .range([0, width]);
     
-    // Crear escala lineal para eje Y
+    // Create linear scale for y-axis
     const yScale = d3.scaleLinear()
       .domain([0, d3.max(inputData, d => d.count) || 0])
       .range([height, 0]);
     
-    // Crear escala de color
-    const hashtags = Array.from(new Set(inputData.map(d => d.hashtag)));
-    const colorScale = d3.scaleOrdinal<string>()
-      .domain(hashtags)
-      .range(d3.quantize(
-        t => d3.interpolateRainbow(t),
-        hashtags.length > 0 ? hashtags.length : 1
-      ));
-    
-    return { xScale, yScale, colorScale, margin, width, height };
+    return { xScale, yScale, margin, width, height };
   }
   
   function findClosestPoint(mouseX, mouseY) {
@@ -89,34 +103,66 @@
       });
     });
     
-    return minDistance < 30 ? closestPoint : null; // 30px umbral para detección
+    return minDistance < 30 ? closestPoint : null; // 30px threshold for detection
   }
   
   function updateChart() {
     if (!data || data.length === 0 || !chartElement || 
         dimensions.width === 0 || dimensions.height === 0 || 
-        !scales.xScale || !scales.yScale || !scales.colorScale) return;
+        !scales.xScale || !scales.yScale) return;
     
-    // Limpiar gráfico anterior si existe
+    // Clear previous chart
     d3.select(chartElement).selectAll("*").remove();
     
-    // Crear contenedor SVG
+    // Create SVG container
     const svg = d3.select(chartElement)
       .attr("width", dimensions.width)
       .attr("height", dimensions.height)
       .append("g")
       .attr("transform", `translate(${scales.margin.left},${scales.margin.top})`);
     
-    // Añadir eje X
+    // Create month formatter
+    const monthFormat = d3.timeFormat("%B");
+    
+    // Add x-axis with all months
     svg.append("g")
       .attr("transform", `translate(0,${scales.height})`)
-      .call(d3.axisBottom(scales.xScale).ticks(5));
+      .call(d3.axisBottom(scales.xScale)
+        .tickFormat(d => monthFormat(d))
+        .ticks(d3.timeMonth.every(1)) // Show every month
+      );
     
-    // Añadir eje Y
+    // Add x-axis label
+    svg.append("text")
+      .attr("text-anchor", "middle")
+      .attr("x", scales.width / 2)
+      .attr("y", scales.height + 35)
+      .style("font-size", "12px")
+      .text(xAxisLabel);
+    
+    // Add y-axis
     svg.append("g")
       .call(d3.axisLeft(scales.yScale));
     
-    // Crear div para tooltip
+    // Add y-axis label
+    svg.append("text")
+      .attr("text-anchor", "middle")
+      .attr("transform", "rotate(-90)")
+      .attr("y", -45)
+      .attr("x", -scales.height / 2)
+      .style("font-size", "12px")
+      .text(yAxisLabel);
+    
+    // Add chart title
+    svg.append("text")
+      .attr("text-anchor", "middle")
+      .attr("x", scales.width / 2)
+      .attr("y", -15)
+      .style("font-size", "16px")
+      .style("font-weight", "bold")
+      .text(chartTitle);
+    
+    // Create tooltip
     tooltip = d3.select(containerElement)
       .append("div")
       .attr("class", "tooltip")
@@ -130,7 +176,7 @@
       .style("font-size", "12px")
       .style("box-shadow", "0 4px 8px rgba(0,0,0,0.2)");
     
-    // Crear área de interacción para tooltip
+    // Add interaction area for tooltip
     svg.append("rect")
       .attr("width", scales.width)
       .attr("height", scales.height)
@@ -143,59 +189,112 @@
         if (closestPoint) {
           const xPos = scales.xScale(new Date(closestPoint.date));
           const yPos = scales.yScale(closestPoint.count);
+          const hashtagColor = hashStringToColor(closestPoint.hashtag);
           
-          // Actualizar contenido y posición del tooltip
+          // Update tooltip content and position
           tooltip
             .style("opacity", 1)
             .style("left", `${event.offsetX + 15}px`)
             .style("top", `${event.offsetY - 28}px`)
             .html(`<div style="display: flex; align-items: center; margin-bottom: 4px;">
-                   <div style="width: 12px; height: 12px; background-color: ${scales.colorScale(
-                     closestPoint.hashtag
-                   )}; margin-right: 6px; border-radius: 50%;"></div>
+                   <div style="width: 12px; height: 12px; background-color: ${hashtagColor}; margin-right: 6px; border-radius: 50%;"></div>
                    <strong>${closestPoint.hashtag}</strong>
                  </div>
                  Date: ${new Date(closestPoint.date).toLocaleDateString()}<br/>
                  Count: ${closestPoint.count}`);
           
-          // Añadir círculo resaltado
+          // Add highlight circle
           svg.selectAll(".hover-circle").remove();
           svg.append("circle")
             .attr("class", "hover-circle")
             .attr("cx", xPos)
             .attr("cy", yPos)
             .attr("r", 5)
-            .style("fill", scales.colorScale(closestPoint.hashtag))
+            .style("fill", hashtagColor)
             .style("stroke", "#fff")
             .style("stroke-width", 2);
         } else {
-          // Ocultar tooltip cuando no está sobre ningún punto
           tooltip.style("opacity", 0);
           svg.selectAll(".hover-circle").remove();
         }
       })
       .on("mouseleave", function() {
-        // Ocultar tooltip y resaltado cuando el ratón sale del área
         tooltip.style("opacity", 0);
         svg.selectAll(".hover-circle").remove();
       });
     
-    // Crear generador de línea
+    // Create line generator
     const lineGenerator = d3.line<HashtagData>()
       .x(d => scales.xScale(new Date(d.date)))
       .y(d => scales.yScale(d.count));
     
-    // Dibujar las líneas
+    // Draw lines with deterministic colors
     svg.selectAll(".line")
       .data(hashtagsGrouped)
       .join("path")
       .attr("fill", "none")
-      .attr("stroke", d => scales.colorScale(d.key))
+      .attr("stroke", d => hashStringToColor(d.key))
       .attr("stroke-width", 1.5)
       .attr("d", d => lineGenerator(d.values));
+    
+    // Add legend
+    const legend = svg.append("g")
+      .attr("transform", `translate(${scales.width + 20}, 0)`);
+    
+    // Only show top 10 hashtags in legend if there are many
+    const legendData = hashtagsGrouped.slice(0, 10);
+    
+    legend.selectAll(".legend-item")
+      .data(legendData)
+      .join("g")
+      .attr("class", "legend-item")
+      .attr("transform", (d, i) => `translate(0, ${i * 20})`)
+      .call(g => {
+        g.append("circle")
+          .attr("r", 5)
+          .attr("fill", d => hashStringToColor(d.key));
+        
+        g.append("text")
+          .attr("x", 10)
+          .attr("y", 5)
+          .attr("font-size", "10px")
+          .text(d => d.key.length > 15 ? d.key.substring(0, 15) + '...' : d.key);
+      });
+    
+    if (hashtagsGrouped.length > 10) {
+      legend.append("text")
+        .attr("y", 10 * 20 + 10)
+        .attr("font-size", "10px")
+        .attr("font-style", "italic")
+        .text(`+ ${hashtagsGrouped.length - 10} more`);
+    }
+    
+    // Add faint grid lines for better readability
+    svg.append("g")
+      .attr("class", "grid y-grid")
+      .call(
+        d3.axisLeft(scales.yScale)
+          .tickSize(-scales.width)
+          .tickFormat("")
+      )
+      .style("stroke", "#e0e0e0")
+      .style("stroke-opacity", 0.05);
+      
+    // Add month dividers as vertical grid lines
+    svg.append("g")
+      .attr("class", "grid x-grid")
+      .call(
+        d3.axisBottom(scales.xScale)
+          .tickSize(scales.height)
+          .tickFormat("")
+          .ticks(d3.timeMonth.every(1))
+      )
+      .attr("transform", `translate(0,0)`)
+      .style("stroke", "#e0e0e0")
+      .style("stroke-opacity", 0.05);
   }
   
-  // Actualizar dimensiones y recalcular gráfico cuando el componente se monta
+  // Update dimensions and recalculate chart when component mounts
   onMount(() => {
     if (containerElement) {
       const { width, height } = containerElement.getBoundingClientRect();
@@ -203,9 +302,8 @@
     }
   });
   
-  // Actualizar gráfico cuando cambian los datos o dimensiones
+  // Update chart when data or dimensions change
   $: if (data && dimensions.width > 0 && dimensions.height > 0) {
-    // Eliminamos el tooltip anterior si existe
     if (tooltip) {
       tooltip.remove();
       tooltip = null;
