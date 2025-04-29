@@ -96,25 +96,32 @@ function App() {
           </div>
           <div className="col-span-4 rounded-lg h-[60vh]">
             {/** Filtering options */}
-            <div className="grid grid-cols-12">
-              <input
-                type="text"
-                placeholder="Type a hashtag"
-                className="w-full p-2 border rounded col-span-4"
-                value={inputValue}
-                onChange={handleInputChange}
-              />
-              <div className="flex">
-                {filters.map((filter) => (
+            <div className="flex flex-col rounded-lg shadow-md border border-gray-200 overflow-hidden">
+              <div className="relative w-full">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-500 text-sm">#</span>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Type a hashtag"
+                  className="w-full py-3 pl-8 pr-3 text-gray-700 bg-white border-0 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  value={inputValue}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div className="flex flex-row justify-stretch border-t border-gray-200">
+                {filters.map((filter, index) => (
                   <button
                     key={filter.id}
-                    className={`col-span-2 px-4 py-2 text-sm font-medium border ${
-                      selectedFilter === filter.label
-                        ? "bg-gray-500 text-white"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    className={`flex-1 px-2 py-3 text-sm font-medium transition-colors duration-150 ${
+                      index > 0 ? "border-l border-gray-200" : ""
+                    } ${
+                      selectedFilter === filter.id
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-50 text-gray-700 hover:bg-gray-100"
                     }`}
-                    onClick={() => handleFilterChange(filter.label)}
-                    aria-pressed={selectedFilter === filter.label}
+                    onClick={() => handleFilterChange(filter.id)}
+                    aria-pressed={selectedFilter === filter.id}
                   >
                     {filter.label}
                   </button>
