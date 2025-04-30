@@ -66,14 +66,14 @@
 
     <div class="grid grid-cols-12">
       <div class="col-span-8">
-        <LineChart data={filteredData} />
+        <LineChart data={[]} />
       </div>
       <div class="col-span-4">
         <WordCloud words={[]} fontSizeScale={80} />
       </div>
 
       <div class="col-span-12">
-        <!-- <HeatMap initialData={filteredData} /> -->
+        <HeatMap data={filteredData} />
       </div>
     </div>
   </div>

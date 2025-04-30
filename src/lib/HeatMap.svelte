@@ -3,34 +3,41 @@
   import { onMount } from "svelte";
   import * as d3 from "d3";
 
-  interface HashtagData {
-    hashtag: string;
-    date: Date;
+  interface TimeLineItem {
+    date: string;
     count: number;
   }
+
+  interface HashtagItem {
+    hashtag: string;
+    timeline: TimeLineItem;
+  }
+
 
   interface CountByDateType {
     date: Date;
     count: number;
   }
 
-  export let initialData: HashtagData[] = [];
+  export let data: HashtagItem[] = [];
   export let title: string = "Tweet Activity over the Year";
 
   let d3Container: HTMLDivElement;
 
   // Calculate countByDate to improve performance
-  $: countByDate = getCountByDate(initialData);
+  $: countByDate = getCountByDate(data);
 
-  function getCountByDate(data: HashtagData[]): CountByDateType[] {
-    const groupedByDate = d3.group(data, (d) => d.date.toDateString());
-    return Array.from(groupedByDate, ([dateStr, values]) => ({
-      date: new Date(dateStr),
-      count: values.reduce((acc, curr) => acc + curr.count, 0),
-    }));
+  function getCountByDate(data: HashtagItem[]): CountByDateType[] {
+    
+    const countByDate: CountByDateType[] = []
+    data.forEach(item => {
+      const {timeLine} = item;
+      
+    })
+
   }
 
-  function createHeatMap(data: CountByDateType[]) {
+  function createHeatMap(data: HashtagItem[]) {
     if (!d3Container) return;
 
     // Clear any previous chart

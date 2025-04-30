@@ -1,10 +1,11 @@
 <script lang="ts">
+  // Required imports
   import { onMount } from "svelte";
   import * as d3 from "d3";
 
-  // Data interfaces
+  // Updated interface for monthly data
   interface TimelinePoint {
-    date: string;
+    month: string;
     count: number;
   }
 
@@ -15,37 +16,63 @@
 
   // Props
   export let data: HashtagData[] = [];
-  export let chartTitle: string = "Hashtag Trends Over Time";
-  export let xAxisLabel: string = "Months of the Year 2022";
-  export let yAxisLabel: string = "Number of Tweets (log scale)"; // Updated to indicate logarithmic scale
+  export let chartTitle: string = "Hashtag Trends by Month in 2022";
+  export let xAxisLabel: string = "Months of the Year";
+  export let yAxisLabel: string = "Number of Tweets (log scale)";
 
   let chartElement: SVGSVGElement;
   let containerElement: HTMLDivElement;
   let dimensions = { width: 0, height: 0 };
   let tooltip;
 
-  // Group data by hashtag - no longer needed as data is already grouped
-  $: hashtagsGrouped = data.slice(0, 50);
-
   // Generate a deterministic color for a hashtag using string hashing
   function hashStringToColor(str: string) {
-    // Simple string hash function
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       hash = str.charCodeAt(i) + ((hash << 5) - hash);
     }
 
-    // Convert hash to RGB values with good color separation
-    // Using HSL for better visual distinction
     const h = Math.abs(hash % 360);
-    const s = 70 + Math.abs((hash >> 8) % 30); // 70-100% saturation
-    const l = 35 + Math.abs((hash >> 16) % 30); // 35-65% lightness
+    const s = 70 + Math.abs((hash >> 8) % 30);
+    const l = 35 + Math.abs((hash >> 16) % 30);
 
     return `hsl(${h}, ${s}%, ${l}%)`;
   }
 
   // Calculate scales and domains
-  $: scales = calculateScales(data.slice(0, 50), dimensions);
+  $: scales = calculateScales(data, dimensions);
+
+  // Order of months for x-axis
+  const monthOrder = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  // Short month names for display
+  const shortMonths = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
 
   function calculateScales(inputData: HashtagData[], dims) {
     if (
@@ -57,12 +84,11 @@
       return { xScale: null, yScale: null, margin: null };
     }
 
-    // Define margins with more space for title and legend
     const margin = { top: 40, right: 120, bottom: 50, left: 70 };
     const width = dims.width - margin.left - margin.right;
     const height = dims.height - margin.top - margin.bottom;
 
-    // Flatten timeline data to find min/max dates and counts
+    // Flatten timeline data to find all counts
     const allTimelinePoints: TimelinePoint[] = [];
     inputData.forEach((hashtag) => {
       hashtag.timeline.forEach((point) => {
@@ -70,57 +96,12 @@
       });
     });
 
-    // Get year from data or default to 2022
-    let startDate, endDate;
-
-    if (allTimelinePoints.length > 0) {
-      try {
-        // Parse all dates to find min and max
-        const dates = allTimelinePoints
-          .map((point) => {
-            const parsedDate = new Date(point.date);
-            if (isNaN(parsedDate.getTime())) {
-              console.error("Invalid date format:", point.date);
-              return null;
-            }
-            return parsedDate;
-          })
-          .filter((d) => d !== null);
-
-        if (dates.length > 0) {
-          // Use regular loop instead of spread operator to prevent stack overflow
-          let minTime = dates[0].getTime();
-          let maxTime = dates[0].getTime();
-
-          for (let i = 1; i < dates.length; i++) {
-            const time = dates[i].getTime();
-            if (time < minTime) minTime = time;
-            if (time > maxTime) maxTime = time;
-          }
-
-          startDate = new Date(minTime);
-          endDate = new Date(maxTime);
-        } else {
-          // Fallback to default
-          startDate = new Date(2022, 0, 1); // January 1st
-          endDate = new Date(2022, 1, 28); // February 28th
-        }
-      } catch (error) {
-        console.error("Error calculating date range:", error);
-        // Default: January to February 2022
-        startDate = new Date(2022, 0, 1); // January 1st
-        endDate = new Date(2022, 1, 28); // February 28th
-      }
-    } else {
-      // Default: January to February 2022
-      startDate = new Date(2022, 0, 1); // January 1st
-      endDate = new Date(2022, 1, 28); // February 28th
-    }
-
+    // Create band scale for months
     const xScale = d3
-      .scaleTime()
-      .domain([startDate, endDate])
-      .range([0, width]);
+      .scaleBand()
+      .domain(monthOrder)
+      .range([0, width])
+      .padding(0.1);
 
     // Find minimum count for log scale (must be > 0)
     let minCount =
@@ -130,27 +111,28 @@
 
     // Create logarithmic scale for y-axis
     const yScale = d3
-      .scaleLog() // Changed to logarithmic scale
+      .scaleLog()
       .domain([minCount, d3.max(allTimelinePoints, (d) => d.count) || 10])
       .range([height, 0])
-      .nice(); // Rounds the domain to nice values
+      .nice();
 
     return { xScale, yScale, margin, width, height };
   }
 
   function findClosestPoint(mouseX, mouseY) {
-    if (!scales.xScale || !scales.yScale || !hashtagsGrouped.length)
-      return null;
+    if (!scales.xScale || !scales.yScale || !data.length) return null;
 
     let closestPoint = null;
     let minDistance = Infinity;
     let closestHashtag = null;
 
-    hashtagsGrouped.forEach((hashtag) => {
+    data.forEach((hashtag) => {
       hashtag.timeline.forEach((point) => {
+        // Skip points with count <= 0 as they're invalid for log scale
         if (point.count <= 0) return;
 
-        const xPos = scales.xScale(new Date(point.date));
+        // Get the center of the band for this month
+        const xPos = scales.xScale(point.month) + scales.xScale.bandwidth() / 2;
         const yPos = scales.yScale(point.count);
         const distance = Math.sqrt(
           Math.pow(xPos - mouseX, 2) + Math.pow(yPos - mouseY, 2),
@@ -195,27 +177,11 @@
         `translate(${scales.margin.left},${scales.margin.top})`,
       );
 
-    // Create month formatter
-    const monthFormat = d3.timeFormat("%B");
-    const dayFormat = d3.timeFormat("%b %d"); // Format for daily view
-
-    // Determine if we're showing days or months based on date range
-    const dateRange = scales.xScale.domain();
-    const diffDays = Math.ceil(
-      (dateRange[1].getTime() - dateRange[0].getTime()) / (1000 * 60 * 60 * 24),
-    );
-    const showDays = diffDays <= 60; // Show days if the range is 60 days or less
-
-    // Add x-axis with appropriate ticks
+    // Add x-axis with month names
     svg
       .append("g")
       .attr("transform", `translate(0,${scales.height})`)
-      .call(
-        d3
-          .axisBottom(scales.xScale)
-          .tickFormat((d) => (showDays ? dayFormat(d) : monthFormat(d)))
-          .ticks(showDays ? d3.timeDay.every(5) : d3.timeMonth.every(1)), // Adjust tick frequency
-      );
+      .call(d3.axisBottom(scales.xScale).tickFormat((d, i) => shortMonths[i]));
 
     // Add x-axis label
     svg
@@ -229,7 +195,6 @@
     // Add y-axis with logarithmic ticks
     svg.append("g").call(
       d3.axisLeft(scales.yScale).tickFormat((d) => {
-        // Format ticks to be more readable for logarithmic scale
         if (d === 1 || d === 10 || d === 100 || d === 1000 || d === 10000) {
           return d.toString();
         } else if (d < 10) {
@@ -286,7 +251,9 @@
         const closestPoint = findClosestPoint(mouseX, mouseY);
 
         if (closestPoint) {
-          const xPos = scales.xScale(new Date(closestPoint.date));
+          // Get the center of the band for this month
+          const xPos =
+            scales.xScale(closestPoint.month) + scales.xScale.bandwidth() / 2;
           const yPos = scales.yScale(closestPoint.count);
           const hashtagColor = hashStringToColor(closestPoint.hashtag);
 
@@ -299,7 +266,7 @@
                  <div style="width: 12px; height: 12px; background-color: ${hashtagColor}; margin-right: 6px; border-radius: 50%;"></div>
                  <strong>${closestPoint.hashtag}</strong>
                </div>
-               Date: ${new Date(closestPoint.date).toLocaleDateString()}<br/>
+               Month: ${closestPoint.month}<br/>
                Count: ${closestPoint.count}`);
 
           // Add highlight circle
@@ -323,33 +290,62 @@
         svg.selectAll(".hover-circle").remove();
       });
 
-    // Create line generator - adapted for logarithmic scale
+    // Create smooth line generator using curve interpolation
     const lineGenerator = (d) => {
-      // Filter out any invalid dates or values <= 0 (invalid for log scale)
-      const validPoints = d.timeline.filter((p) => {
-        const date = new Date(p.date);
-        return !isNaN(date.getTime()) && p.count > 0;
-      });
+      // Filter out any invalid values <= 0 (invalid for log scale)
+      const validPoints = d.timeline.filter((p) => p.count > 0);
 
-      return d3
-        .line()
-        .x((p) => scales.xScale(new Date(p.date)))
-        .y((p) => scales.yScale(p.count))
-        .defined((p) => {
-          const date = new Date(p.date);
-          return !isNaN(date.getTime()) && p.count > 0;
-        })(validPoints);
+      // Sort points by month order
+      validPoints.sort(
+        (a, b) => monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month),
+      );
+
+      // Map the data points to x,y coordinates
+      const points = validPoints.map((p) => ({
+        x: scales.xScale(p.month) + scales.xScale.bandwidth() / 2,
+        y: scales.yScale(p.count),
+      }));
+
+      // If there are not enough points for a smooth curve, return null
+      if (points.length < 2) return null;
+
+      // Create the smooth line path
+      const linePath = d3
+        .line<{ x: number; y: number }>()
+        .x((d) => d.x)
+        .y((d) => d.y)
+        .curve(d3.curveCardinal.tension(0.5)); // Use cardinal curve for smoothing
+
+      return linePath(points);
     };
 
-    // Draw lines with deterministic colors
+    // Draw smooth lines with deterministic colors
     svg
       .selectAll(".line")
-      .data(hashtagsGrouped)
+      .data(data)
       .join("path")
       .attr("fill", "none")
       .attr("stroke", (d) => hashStringToColor(d.hashtag))
-      .attr("stroke-width", 1.5)
+      .attr("stroke-width", 2)
       .attr("d", lineGenerator);
+
+    // Add data points
+    data.forEach((hashtag) => {
+      const validPoints = hashtag.timeline.filter((p) => p.count > 0);
+
+      svg
+        .selectAll(`.dot-${hashtag.hashtag.replace(/[^a-zA-Z0-9]/g, "-")}`)
+        .data(validPoints)
+        .join("circle")
+        .attr("class", `dot-${hashtag.hashtag.replace(/[^a-zA-Z0-9]/g, "-")}`)
+        .attr(
+          "cx",
+          (d) => scales.xScale(d.month) + scales.xScale.bandwidth() / 2,
+        )
+        .attr("cy", (d) => scales.yScale(d.count))
+        .attr("r", 3)
+        .attr("fill", hashStringToColor(hashtag.hashtag));
+    });
 
     // Add legend
     const legend = svg
@@ -357,7 +353,7 @@
       .attr("transform", `translate(${scales.width + 20}, 0)`);
 
     // Only show top 10 hashtags in legend if there are many
-    const legendData = hashtagsGrouped.slice(0, 15);
+    const legendData = data.slice(0, 10);
 
     legend
       .selectAll(".legend-item")
@@ -381,16 +377,16 @@
           );
       });
 
-    if (hashtagsGrouped.length > 10) {
+    if (data.length > 10) {
       legend
         .append("text")
-        .attr("y", 15 * 20 + 10)
+        .attr("y", 10 * 20 + 10)
         .attr("font-size", "10px")
         .attr("font-style", "italic")
-        .text(`+ ${hashtagsGrouped.length - 10} more`);
+        .text(`+ ${data.length - 10} more`);
     }
 
-    // Add faint grid lines for better readability
+    // Add faint grid lines
     svg
       .append("g")
       .attr("class", "grid y-grid")
@@ -398,20 +394,17 @@
       .style("stroke", "#e0e0e0")
       .style("stroke-opacity", 0.1);
 
-    // Add appropriate dividers as vertical grid lines
-    const gridTicks = showDays ? d3.timeDay.every(1) : d3.timeMonth.every(1);
-
+    // Add vertical grid lines for each month
     svg
       .append("g")
       .attr("class", "grid x-grid")
-      .call(
-        d3
-          .axisBottom(scales.xScale)
-          .tickSize(scales.height)
-          .tickFormat("")
-          .ticks(gridTicks),
-      )
-      .attr("transform", `translate(0,0)`)
+      .selectAll("line")
+      .data(monthOrder)
+      .join("line")
+      .attr("x1", (d) => scales.xScale(d) + scales.xScale.bandwidth() / 2)
+      .attr("x2", (d) => scales.xScale(d) + scales.xScale.bandwidth() / 2)
+      .attr("y1", 0)
+      .attr("y2", scales.height)
       .style("stroke", "#e0e0e0")
       .style("stroke-opacity", 0.1);
   }
