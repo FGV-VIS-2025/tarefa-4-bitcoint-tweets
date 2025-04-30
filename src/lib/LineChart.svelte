@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import * as d3 from "d3";
 
-  // Updated interfaces
+  // Data interfaces
   interface TimelinePoint {
     date: string;
     count: number;
@@ -17,7 +17,7 @@
   export let data: HashtagData[] = [];
   export let chartTitle: string = "Hashtag Trends Over Time";
   export let xAxisLabel: string = "Months of the Year 2022";
-  export let yAxisLabel: string = "Number of Tweets";
+  export let yAxisLabel: string = "Number of Tweets (log scale)"; // Updated to indicate logarithmic scale
 
   let chartElement: SVGSVGElement;
   let containerElement: HTMLDivElement;
@@ -25,7 +25,7 @@
   let tooltip;
 
   // Group data by hashtag - no longer needed as data is already grouped
-  $: hashtagsGrouped = data;
+  $: hashtagsGrouped = data.slice(0, 50);
 
   // Generate a deterministic color for a hashtag using string hashing
   function hashStringToColor(str: string) {
@@ -45,7 +45,7 @@
   }
 
   // Calculate scales and domains
-  $: scales = calculateScales(data, dimensions);
+  $: scales = calculateScales(data.slice(0, 50), dimensions);
 
   function calculateScales(inputData: HashtagData[], dims) {
     if (
@@ -122,11 +122,18 @@
       .domain([startDate, endDate])
       .range([0, width]);
 
-    // Create linear scale for y-axis
+    // Find minimum count for log scale (must be > 0)
+    let minCount =
+      d3.min(allTimelinePoints, (d) => (d.count > 0 ? d.count : null)) || 1;
+    // Use a minimum threshold to avoid issues with very small values
+    minCount = Math.max(0.1, minCount);
+
+    // Create logarithmic scale for y-axis
     const yScale = d3
-      .scaleLinear()
-      .domain([0, d3.max(allTimelinePoints, (d) => d.count) || 0])
-      .range([height, 0]);
+      .scaleLog() // Changed to logarithmic scale
+      .domain([minCount, d3.max(allTimelinePoints, (d) => d.count) || 10])
+      .range([height, 0])
+      .nice(); // Rounds the domain to nice values
 
     return { xScale, yScale, margin, width, height };
   }
@@ -141,6 +148,8 @@
 
     hashtagsGrouped.forEach((hashtag) => {
       hashtag.timeline.forEach((point) => {
+        if (point.count <= 0) return;
+
         const xPos = scales.xScale(new Date(point.date));
         const yPos = scales.yScale(point.count);
         const distance = Math.sqrt(
@@ -217,8 +226,18 @@
       .style("font-size", "12px")
       .text(xAxisLabel);
 
-    // Add y-axis
-    svg.append("g").call(d3.axisLeft(scales.yScale));
+    // Add y-axis with logarithmic ticks
+    svg.append("g").call(
+      d3.axisLeft(scales.yScale).tickFormat((d) => {
+        // Format ticks to be more readable for logarithmic scale
+        if (d === 1 || d === 10 || d === 100 || d === 1000 || d === 10000) {
+          return d.toString();
+        } else if (d < 10) {
+          return d.toFixed(1);
+        }
+        return d.toFixed(0);
+      }),
+    );
 
     // Add y-axis label
     svg
@@ -277,11 +296,11 @@
             .style("left", `${event.offsetX + 15}px`)
             .style("top", `${event.offsetY - 28}px`)
             .html(`<div style="display: flex; align-items: center; margin-bottom: 4px;">
-                   <div style="width: 12px; height: 12px; background-color: ${hashtagColor}; margin-right: 6px; border-radius: 50%;"></div>
-                   <strong>${closestPoint.hashtag}</strong>
-                 </div>
-                 Date: ${new Date(closestPoint.date).toLocaleDateString()}<br/>
-                 Count: ${closestPoint.count}`);
+                 <div style="width: 12px; height: 12px; background-color: ${hashtagColor}; margin-right: 6px; border-radius: 50%;"></div>
+                 <strong>${closestPoint.hashtag}</strong>
+               </div>
+               Date: ${new Date(closestPoint.date).toLocaleDateString()}<br/>
+               Count: ${closestPoint.count}`);
 
           // Add highlight circle
           svg.selectAll(".hover-circle").remove();
@@ -304,12 +323,12 @@
         svg.selectAll(".hover-circle").remove();
       });
 
-    // Create line generator - adapted for the new data structure
+    // Create line generator - adapted for logarithmic scale
     const lineGenerator = (d) => {
-      // Filter out any invalid dates before generating the line
+      // Filter out any invalid dates or values <= 0 (invalid for log scale)
       const validPoints = d.timeline.filter((p) => {
         const date = new Date(p.date);
-        return !isNaN(date.getTime());
+        return !isNaN(date.getTime()) && p.count > 0;
       });
 
       return d3
@@ -318,9 +337,7 @@
         .y((p) => scales.yScale(p.count))
         .defined((p) => {
           const date = new Date(p.date);
-          return (
-            !isNaN(date.getTime()) && p.count !== undefined && p.count !== null
-          );
+          return !isNaN(date.getTime()) && p.count > 0;
         })(validPoints);
     };
 
@@ -340,7 +357,7 @@
       .attr("transform", `translate(${scales.width + 20}, 0)`);
 
     // Only show top 10 hashtags in legend if there are many
-    const legendData = hashtagsGrouped.slice(0, 10);
+    const legendData = hashtagsGrouped.slice(0, 15);
 
     legend
       .selectAll(".legend-item")
@@ -367,7 +384,7 @@
     if (hashtagsGrouped.length > 10) {
       legend
         .append("text")
-        .attr("y", 10 * 20 + 10)
+        .attr("y", 15 * 20 + 10)
         .attr("font-size", "10px")
         .attr("font-style", "italic")
         .text(`+ ${hashtagsGrouped.length - 10} more`);
