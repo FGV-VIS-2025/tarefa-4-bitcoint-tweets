@@ -2,15 +2,9 @@
   import SearchFilter from "$lib/SearchFilter.svelte";
   import LineChart from "$lib/LineChart.svelte";
   import WordCloud from "$lib/WordCloud.svelte";
-  import HeatMap from "../lib/HeatMap.svelte";
+  import HeatMap from "$lib/HeatMap.svelte";
 
-  import hashtagDataJson from "$lib/data/hashtag-count.json";
-  import wordcloudData from "$lib/data/wordcloud-data.json";
-
-  const hashtagData = hashtagDataJson.map((item) => ({
-    ...item,
-    date: new Date(item.date),
-  }));
+  import hashtagData from "$lib/data/hashtag_data.json";
 
   $: filteredData = hashtagData;
 
@@ -54,7 +48,7 @@
 
 <main class="flex justify-center">
   <div class="max-w-[1728px] w-full">
-    <div class="py-10 flex flex-col items-center w-full">
+    <div class="py-4 flex flex-col items-center w-full">
       <div class="max-w-4xl space-y-8">
         <div>
           <h1 class="text-6xl font-bold text-[#ff9900] text-center">
@@ -75,11 +69,11 @@
         <LineChart data={filteredData} />
       </div>
       <div class="col-span-4">
-        <WordCloud words={wordcloudData} fontSizeScale={80} />
+        <WordCloud words={[]} fontSizeScale={80} />
       </div>
 
       <div class="col-span-12">
-        <HeatMap initialData={filteredData} />
+        <!-- <HeatMap initialData={filteredData} /> -->
       </div>
     </div>
   </div>
