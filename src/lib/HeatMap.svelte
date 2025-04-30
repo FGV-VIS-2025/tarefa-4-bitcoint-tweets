@@ -1,12 +1,15 @@
-<!-- HeatMap.svelte -->
 <script lang="ts">
   import { onMount } from "svelte";
   import * as d3 from "d3";
 
-  interface HashtagData {
-    hashtag: string;
-    date: Date;
+  interface TimeLineItem {
+    date: string;
     count: number;
+  }
+
+  interface HashtagItem {
+    hashtag: string;
+    timeline: TimeLineItem[];
   }
 
   interface CountByDateType {
@@ -14,34 +17,54 @@
     count: number;
   }
 
-  export let initialData: HashtagData[] = [];
-  export let title: string = "Tweet Activity over the Year";
+  export let data: HashtagItem[] = [];
+  export let title: string = "Tweet Activity over the Year 2022";
 
   let d3Container: HTMLDivElement;
 
-  // Calculate countByDate to improve performance
-  $: countByDate = getCountByDate(initialData);
+  $: countByDate = getCountByDate(data);
 
-  function getCountByDate(data: HashtagData[]): CountByDateType[] {
-    const groupedByDate = d3.group(data, (d) => d.date.toDateString());
-    return Array.from(groupedByDate, ([dateStr, values]) => ({
-      date: new Date(dateStr),
-      count: values.reduce((acc, curr) => acc + curr.count, 0),
-    }));
+  function getCountByDate(data: HashtagItem[]): CountByDateType[] {
+    const countMap = new Map<string, number>();
+    
+    data.forEach(item => {
+      const { timeline } = item;
+      
+      if (timeline) {
+        const timelineItems = Array.isArray(timeline) ? timeline : [timeline];
+        
+        timelineItems.forEach(timeItem => {
+          if (timeItem && timeItem.date) {
+            const dateStr = timeItem.date;
+            const count = timeItem.count || 0;
+            
+            const currentCount = countMap.get(dateStr) || 0;
+            countMap.set(dateStr, currentCount + count);
+          }
+        });
+      }
+    });
+    
+    const result: CountByDateType[] = [];
+    countMap.forEach((count, dateStr) => {
+      const date = new Date(dateStr);
+      if (!isNaN(date.getTime())) {
+        result.push({ date, count });
+      }
+    });
+    
+    return result;
   }
 
   function createHeatMap(data: CountByDateType[]) {
     if (!d3Container) return;
 
-    // Clear any previous chart
     d3.select(d3Container).selectAll("*").remove();
-
-    // Ensure we have data to display
     if (!data || data.length === 0) {
       console.warn("No data available for the heatmap");
       return;
     }
-
+  
     // Get container dimensions
     const containerWidth = d3Container.clientWidth || 800;
     const containerHeight = d3Container.clientHeight || 320;
@@ -86,16 +109,15 @@
     let startDate: Date, endDate: Date;
 
     if (dateExtent[0] && dateExtent[1]) {
-      // Use the data's date range
-      startDate = d3.timeWeek.floor(dateExtent[0]); // Start at beginning of week
-      endDate = d3.timeWeek.ceil(dateExtent[1]); // End at end of week
+      startDate = d3.timeWeek.floor(dateExtent[0]);
+      endDate = d3.timeWeek.ceil(dateExtent[1]);
     } else {
       // Fallback to one year of data
       endDate = new Date();
       startDate = new Date();
       startDate.setFullYear(startDate.getFullYear() - 1);
-      startDate = d3.timeWeek.floor(startDate); // Start at beginning of week
-      endDate = d3.timeWeek.ceil(endDate); // End at end of week
+      startDate = d3.timeWeek.floor(startDate);
+      endDate = d3.timeWeek.ceil(endDate);
     }
 
     // Format months along the top
@@ -112,9 +134,8 @@
       .append("text")
       .attr("class", "month")
       .style("font-size", `${Math.max(9, cellSize * 0.45)}px`)
-      .style("fill", "#666666") // Dark gray for light mode
+      .style("fill", "#666666")
       .attr("x", (d) => {
-        // Calculate the week number from the start date
         const firstDayOfMonth = d;
         const weekNum = Math.floor(
           (firstDayOfMonth.getTime() - startDate.getTime()) /
@@ -141,7 +162,6 @@
         return monthNames[d.getMonth()];
       });
 
-    // Add day of week labels - all days of the week
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
     svg
@@ -154,35 +174,29 @@
       .style("font-weight", "500")
       .style("fill", "#666666")
       .attr("x", -25)
-      .attr("y", (d, i) => i * fullCellSize + fullCellSize / 2 + 3) // Centered with the cell
+      .attr("y", (d, i) => i * fullCellSize + fullCellSize / 2 + 3)
       .style("text-anchor", "start")
       .text((d) => d);
 
     // Create week groups
     const weeks = svg
       .selectAll(".week")
-      .data(d3.range(0, 53)) // 53 weeks in a year
+      .data(d3.range(0, 53))
       .enter()
       .append("g")
       .attr("class", "week")
       .attr("transform", (d) => `translate(${d * fullCellSize}, 0)`);
 
-    // Create day cells within each week
     weeks
       .selectAll(".day-cell")
       .data((weekNum) => {
-        // For each week, return the data for all 7 days
         return d3.range(7).map((dayNum) => {
-          // Calculate the date for this cell
           const cellDate = new Date(startDate);
           cellDate.setDate(cellDate.getDate() + weekNum * 7 + dayNum);
 
-          // Skip dates beyond endDate
           if (cellDate > endDate) {
             return { date: cellDate, count: null };
           }
-
-          // Find the data for this date by comparing year, month, and day
           const matchingData = data.find(
             (d) =>
               d.date.getFullYear() === cellDate.getFullYear() &&
@@ -201,19 +215,19 @@
       .attr("class", "day-cell")
       .attr("width", cellSize)
       .attr("height", cellSize)
-      .attr("rx", 2) // Rounded corners
+      .attr("rx", 2)
       .attr("ry", 2)
       .attr("y", (d) => {
-        const dayOfWeek = d.date.getDay(); // 0 is Sunday, 6 is Saturday
+        const dayOfWeek = d.date.getDay();
         return dayOfWeek * fullCellSize;
       })
       .attr("fill", (d) => {
-        if (d.count === null) return "transparent"; // Hide cells beyond the date range
-        return d.count > 0 ? colorScale(d.count) : "#ebedf0"; // Light gray for empty cells
+        if (d.count === null) return "transparent";
+        return d.count > 0 ? colorScale(d.count) : "#ebedf0";
       })
       .style("stroke", "#ffffff")
       .style("stroke-width", "1px")
-      .append("title") // Tooltip on hover
+      .append("title")
       .text((d) => {
         const options = {
           weekday: "long",
@@ -282,29 +296,23 @@
       .text(maxCount);
   }
 
-  // Use Svelte's reactive statements to update the chart when data changes
   $: if (d3Container && countByDate) {
     createHeatMap(countByDate);
   }
 
-  // Initialize chart when component mounts
   onMount(() => {
-    // Add a small delay to ensure the container is properly sized
     setTimeout(() => {
       if (d3Container && countByDate) {
         createHeatMap(countByDate);
       }
-    }, 100);
+    }, 50);
 
-    // Add window resize handler
     const handleResize = () => {
       if (d3Container && countByDate) {
         createHeatMap(countByDate);
       }
     };
-
     window.addEventListener("resize", handleResize);
-
     return () => {
       window.removeEventListener("resize", handleResize);
     };
