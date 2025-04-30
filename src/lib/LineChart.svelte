@@ -135,7 +135,7 @@
         const xPos = scales.xScale(point.month) + scales.xScale.bandwidth() / 2;
         const yPos = scales.yScale(point.count);
         const distance = Math.sqrt(
-          Math.pow(xPos - mouseX, 2) + Math.pow(yPos - mouseY, 2),
+          Math.pow(xPos - mouseX, 2) + Math.pow(yPos - mouseY, 2)
         );
 
         if (distance < minDistance) {
@@ -174,7 +174,7 @@
       .append("g")
       .attr(
         "transform",
-        `translate(${scales.margin.left},${scales.margin.top})`,
+        `translate(${scales.margin.left},${scales.margin.top})`
       );
 
     // Add x-axis with month names
@@ -201,7 +201,7 @@
           return d.toFixed(1);
         }
         return d.toFixed(0);
-      }),
+      })
     );
 
     // Add y-axis label
@@ -249,8 +249,16 @@
       .on("mousemove", function (event) {
         const [mouseX, mouseY] = d3.pointer(event);
         const closestPoint = findClosestPoint(mouseX, mouseY);
-
+        
         if (closestPoint) {
+          // Highlight the current line and dim the others
+          const noCurrentLines = d3.selectAll(".line").nodes();
+          noCurrentLines.forEach((line) => {
+            d3.select(line).style("opacity", 0.1);
+          });
+          const currentLine = d3.select(`.line-${closestPoint?.hashtag}`);
+          currentLine.style("opacity", 1);
+
           // Get the center of the band for this month
           const xPos =
             scales.xScale(closestPoint.month) + scales.xScale.bandwidth() / 2;
@@ -288,13 +296,18 @@
       .on("mouseleave", function () {
         tooltip.style("opacity", 0);
         svg.selectAll(".hover-circle").remove();
+
+        const allLines = d3.selectAll(".line").nodes();
+        allLines.forEach((line) => {
+          d3.select(line).style("opacity", 1);
+        });
       });
 
     const lineGenerator = (d) => {
       const validPoints = d.months.filter((p) => p.count > 0);
 
       validPoints.sort(
-        (a, b) => monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month),
+        (a, b) => monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month)
       );
 
       // Map the data points to x,y coordinates
@@ -320,6 +333,7 @@
       .data(data)
       .join("path")
       .attr("fill", "none")
+      .attr("class", (d) => `line line-${d.hashtag}`)
       .attr("stroke", (d) => hashStringToColor(d.hashtag))
       .attr("stroke-width", 2)
       .attr("d", lineGenerator);
@@ -329,13 +343,13 @@
       const validPoints = hashtag.months.filter((p) => p.count > 0);
 
       svg
-        .selectAll(`.dot-${hashtag.hashtag.replace(/[^a-zA-Z0-9]/g, "-")}`)
+        .selectAll(`.dot-${hashtag.hashtag}`)
         .data(validPoints)
         .join("circle")
-        .attr("class", `dot-${hashtag.hashtag.replace(/[^a-zA-Z0-9]/g, "-")}`)
+        .attr("class", `dot-${hashtag.hashtag}`)
         .attr(
           "cx",
-          (d) => scales.xScale(d.month) + scales.xScale.bandwidth() / 2,
+          (d) => scales.xScale(d.month) + scales.xScale.bandwidth() / 2
         )
         .attr("cy", (d) => scales.yScale(d.count))
         .attr("r", 3)
@@ -367,7 +381,7 @@
           .text((d) =>
             d.hashtag.length > 15
               ? d.hashtag.substring(0, 15) + "..."
-              : d.hashtag,
+              : d.hashtag
           );
       });
 
