@@ -3,19 +3,19 @@
   import { onMount } from "svelte";
   import * as d3 from "d3";
 
-  // Updated interface for monthly data
-  interface TimelinePoint {
+  interface MonthPoint {
     month: string;
     count: number;
   }
 
   interface HashtagData {
     hashtag: string;
-    timeline: TimelinePoint[];
+    months: MonthPoint[];
+    total: number;
   }
 
   // Props
-  export let data: HashtagData[] = [];
+  export let filteredData: HashtagData[] = [];
   export let chartTitle: string = "Hashtag Trends by Month in 2022";
   export let xAxisLabel: string = "Months of the Year";
   export let yAxisLabel: string = "Number of Tweets (log scale)";
@@ -24,6 +24,8 @@
   let containerElement: HTMLDivElement;
   let dimensions = { width: 0, height: 0 };
   let tooltip;
+
+  $: data = filteredData.slice(0, 50);
 
   // Generate a deterministic color for a hashtag using string hashing
   function hashStringToColor(str: string) {
@@ -88,31 +90,31 @@
     const width = dims.width - margin.left - margin.right;
     const height = dims.height - margin.top - margin.bottom;
 
-    // Flatten timeline data to find all counts
-    const allTimelinePoints: TimelinePoint[] = [];
+    // Flatten months
+    const allMonthPoints: MonthPoint[] = [];
     inputData.forEach((hashtag) => {
-      hashtag.timeline.forEach((point) => {
-        allTimelinePoints.push(point);
+      hashtag.months.forEach((point) => {
+        allMonthPoints.push(point);
       });
     });
 
-    // Create band scale for months
+    // Create band scale
     const xScale = d3
       .scaleBand()
       .domain(monthOrder)
       .range([0, width])
       .padding(0.1);
 
-    // Find minimum count for log scale (must be > 0)
+    // Find minimum count
     let minCount =
-      d3.min(allTimelinePoints, (d) => (d.count > 0 ? d.count : null)) || 1;
+      d3.min(allMonthPoints, (d) => (d.count > 0 ? d.count : null)) || 1;
     // Use a minimum threshold to avoid issues with very small values
     minCount = Math.max(0.1, minCount);
 
     // Create logarithmic scale for y-axis
     const yScale = d3
       .scaleLog()
-      .domain([minCount, d3.max(allTimelinePoints, (d) => d.count) || 10])
+      .domain([minCount, d3.max(allMonthPoints, (d) => d.count) || 10])
       .range([height, 0])
       .nice();
 
@@ -127,11 +129,9 @@
     let closestHashtag = null;
 
     data.forEach((hashtag) => {
-      hashtag.timeline.forEach((point) => {
-        // Skip points with count <= 0 as they're invalid for log scale
+      hashtag.months.forEach((point) => {
         if (point.count <= 0) return;
 
-        // Get the center of the band for this month
         const xPos = scales.xScale(point.month) + scales.xScale.bandwidth() / 2;
         const yPos = scales.yScale(point.count);
         const distance = Math.sqrt(
@@ -290,12 +290,9 @@
         svg.selectAll(".hover-circle").remove();
       });
 
-    // Create smooth line generator using curve interpolation
     const lineGenerator = (d) => {
-      // Filter out any invalid values <= 0 (invalid for log scale)
-      const validPoints = d.timeline.filter((p) => p.count > 0);
+      const validPoints = d.months.filter((p) => p.count > 0);
 
-      // Sort points by month order
       validPoints.sort(
         (a, b) => monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month),
       );
@@ -306,7 +303,6 @@
         y: scales.yScale(p.count),
       }));
 
-      // If there are not enough points for a smooth curve, return null
       if (points.length < 2) return null;
 
       // Create the smooth line path
@@ -314,12 +310,11 @@
         .line<{ x: number; y: number }>()
         .x((d) => d.x)
         .y((d) => d.y)
-        .curve(d3.curveCardinal.tension(0.5)); // Use cardinal curve for smoothing
+        .curve(d3.curveCardinal.tension(0.5));
 
       return linePath(points);
     };
 
-    // Draw smooth lines with deterministic colors
     svg
       .selectAll(".line")
       .data(data)
@@ -331,7 +326,7 @@
 
     // Add data points
     data.forEach((hashtag) => {
-      const validPoints = hashtag.timeline.filter((p) => p.count > 0);
+      const validPoints = hashtag.months.filter((p) => p.count > 0);
 
       svg
         .selectAll(`.dot-${hashtag.hashtag.replace(/[^a-zA-Z0-9]/g, "-")}`)
@@ -352,8 +347,7 @@
       .append("g")
       .attr("transform", `translate(${scales.width + 20}, 0)`);
 
-    // Only show top 10 hashtags in legend if there are many
-    const legendData = data.slice(0, 10);
+    const legendData = data.slice(0, 15);
 
     legend
       .selectAll(".legend-item")
@@ -380,7 +374,7 @@
     if (data.length > 10) {
       legend
         .append("text")
-        .attr("y", 10 * 20 + 10)
+        .attr("y", 15 * 20 + 10)
         .attr("font-size", "10px")
         .attr("font-style", "italic")
         .text(`+ ${data.length - 10} more`);

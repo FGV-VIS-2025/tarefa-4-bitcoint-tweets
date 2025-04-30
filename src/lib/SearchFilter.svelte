@@ -10,7 +10,7 @@
     { id: "exact-match", label: "Exact Match" },
   ];
 
-  // Initialize state
+  // State variables
   let inputValue = "";
   let selectedFilter = filters[0].id;
 
