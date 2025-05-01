@@ -6,14 +6,42 @@
 
   import timelineData from "$lib/data/hashtag_timeline.json";
   import hashtagData from "$lib/data/hashtag_monthly.json";
-  import wordCloudData from "$lib/data/wordcloud_data.json";
+  import wordCloudData from "$lib/data/hashtag_wordclouds_1000.json";
 
   $: filteredHashtagData = hashtagData;
   $: filteredTimelineData = timelineData;
 
+  $: filteredWordCloudData = [];
+
   // State to store search parameters from child component
   let searchQuery = "";
   let searchFilterType = "";
+
+  // Process wordcloud data to format needed by WordCloud component
+  function processWordCloudData(data) {
+    const allWords = [];
+    
+    data.forEach(hashtag => {
+      if (hashtag.wordcloud && Array.isArray(hashtag.wordcloud)) {
+        hashtag.wordcloud.forEach(wordItem => {
+          // Add each word to our combined list
+          allWords.push({
+            text: wordItem.word,
+            value: wordItem.count
+          });
+        });
+      }
+    });
+    
+    allWords.sort((a, b) => b.value - a.value);
+    return allWords.slice(0, 100);
+  }
+
+  $: {
+    if (wordCloudData && Array.isArray(wordCloudData)) {
+      filteredWordCloudData = processWordCloudData(wordCloudData);
+    }
+  }
 
   // Function to handle type filtering
   function handleFilter(filterType, hashtag, query) {
@@ -46,6 +74,7 @@
     if (!query) {
       filteredHashtagData = hashtagData;
       filteredTimelineData = timelineData;
+      filteredWordCloudData = processWordCloudData(wordCloudData);
       return;
     }
 
@@ -62,6 +91,16 @@
       const queryLower = query.toLowerCase();
       return handleFilter(filterType, hashtag, queryLower);
     });
+
+    // Filter wordcloud data using the same filter logic
+    const filteredWordCloudItems = wordCloudData.filter((item) => {
+      const hashtag = item.hashtag.toLowerCase();
+      const queryLower = query.toLowerCase();
+      return handleFilter(filterType, hashtag, queryLower);
+    });
+
+    // Process the filtered wordcloud data
+    filteredWordCloudData = processWordCloudData(filteredWordCloudItems);
   }
 </script>
 
@@ -88,7 +127,7 @@
         <LineChart filteredData={filteredHashtagData} />
       </div>
       <div class="col-span-4">
-        <WordCloud words={wordCloudData} fontSizeScale={80} />
+        <WordCloud words={filteredWordCloudData} fontSizeScale={80} />
       </div>
 
       <div class="col-span-12">
