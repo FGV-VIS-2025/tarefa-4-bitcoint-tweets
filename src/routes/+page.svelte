@@ -54,7 +54,7 @@
     
     normalizedWords.sort((a, b) => b.originalValue - a.originalValue);
     
-    return normalizedWords.slice(0, 60);
+    return normalizedWords.slice(0, 30);
   }
 
   $: {
@@ -149,14 +149,15 @@
       <div class="col-span-4">
         <WordCloud 
           words={filteredWordCloudData} 
-          fontSizeScale={60} 
+          tooltipPosition="footer"
+          fontSizeScale={35} 
           colorScheme={d3.schemeSet2} 
           animationDuration={1500}
           fontFamily="'Montserrat', sans-serif"
           enableExport={true}
         />
       </div>
-
+      <div class="pt-4"/>
       <div class="col-span-12">
         <HeatMap data={filteredTimelineData} />
       </div>
