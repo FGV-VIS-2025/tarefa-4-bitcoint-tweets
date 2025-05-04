@@ -6,14 +6,62 @@
 
   import timelineData from "$lib/data/hashtag_timeline.json";
   import hashtagData from "$lib/data/hashtag_monthly.json";
-  import wordCloudData from "$lib/data/wordcloud_data.json";
+  import wordCloudData from "$lib/data/hashtag_wordclouds_1000.json";
+  import * as d3 from "d3";
 
   $: filteredHashtagData = hashtagData;
   $: filteredTimelineData = timelineData;
+  $: filteredWordCloudData = [];
 
   // State to store search parameters from child component
   let searchQuery = "";
   let searchFilterType = "";
+
+  function processWordCloudData(data) {
+    const wordCounts = {};
+    
+    data.forEach(hashtag => {
+      if (hashtag.wordcloud && Array.isArray(hashtag.wordcloud)) {
+        hashtag.wordcloud.forEach(wordItem => {
+          const word = wordItem.word;
+          // If the word exists, add to its count, otherwise create new entry
+          if (wordCounts[word]) {
+            wordCounts[word] += wordItem.count;
+          } else {
+            wordCounts[word] = wordItem.count;
+          }
+        });
+      }
+    });
+    
+    const aggregatedWords = Object.entries(wordCounts).map(([text, count]) => ({
+      text,
+      value: count
+    }));
+    
+    const maxCount = Math.max(...aggregatedWords.map(item => item.value));
+    const minCount = Math.min(...aggregatedWords.map(item => item.value));
+
+    const normalizedWords = aggregatedWords.map(item => {
+      const normalizedValue = Math.log(item.value + 1) / Math.log(maxCount + 1) * 100;
+      
+      return {
+        text: item.text,
+        originalValue: item.value,
+        value: normalizedValue
+      };
+    });
+    
+    normalizedWords.sort((a, b) => b.originalValue - a.originalValue);
+    
+    return normalizedWords.slice(0, 28);
+  }
+
+  $: {
+    if (wordCloudData && Array.isArray(wordCloudData)) {
+      filteredWordCloudData = processWordCloudData(wordCloudData);
+    }
+  }
 
   // Function to handle type filtering
   function handleFilter(filterType, hashtag, query) {
@@ -46,10 +94,11 @@
     if (!query) {
       filteredHashtagData = hashtagData;
       filteredTimelineData = timelineData;
+      filteredWordCloudData = processWordCloudData(wordCloudData);
       return;
     }
 
-    // Here you could also trigger an actual search operation
+    // Filter hashtag data
     filteredHashtagData = hashtagData.filter((item) => {
       const hashtag = item.hashtag.toLowerCase();
       const queryLower = query.toLowerCase();
@@ -62,6 +111,16 @@
       const queryLower = query.toLowerCase();
       return handleFilter(filterType, hashtag, queryLower);
     });
+
+    // Filter wordcloud data using the same filter logic
+    const filteredWordCloudItems = wordCloudData.filter((item) => {
+      const hashtag = item.hashtag.toLowerCase();
+      const queryLower = query.toLowerCase();
+      return handleFilter(filterType, hashtag, queryLower);
+    });
+
+    // Process the filtered wordcloud data with aggregation
+    filteredWordCloudData = processWordCloudData(filteredWordCloudItems);
   }
 </script>
 
@@ -88,9 +147,17 @@
         <LineChart filteredData={filteredHashtagData} />
       </div>
       <div class="col-span-4">
-        <WordCloud words={wordCloudData} fontSizeScale={80} />
+        <WordCloud 
+          words={filteredWordCloudData} 
+          tooltipPosition="footer"
+          fontSizeScale={35} 
+          colorScheme={d3.schemeSet2} 
+          animationDuration={1500}
+          fontFamily="'Montserrat', sans-serif"
+          enableExport={true}
+        />
       </div>
-
+      <div class="pt-4"/>
       <div class="col-span-12">
         <HeatMap data={filteredTimelineData} />
       </div>
