@@ -4,45 +4,37 @@
 
   // Props
   export let words = [];
-  export let title = "Sentence analysis of tweets"; // Título para el componente
+  export let title = "Analysis of tweet sentences by keyword"; 
   export let fontSizeScale = 30;
   export let colorScheme = d3.schemeCategory10;
   export let fontFamily = "'Montserrat', 'Helvetica Neue', Arial, sans-serif";
   export let animationDuration = 1200;
   export let highlightColor = "#ff6600";
   export let backgroundColor = "transparent";
-  // Removed tooltipPosition prop since tooltips are removed
   
   // Opciones avanzadas
-  //export let spiralResolution = 0.1; // Menor = más denso
   export let fontWeightMin = 300;
   export let fontWeightMax = 700;
   export let highContrastMode = false; // Para accesibilidad
   export let useGrid = false; // Distribuir en grid en lugar de espiral
-  export let padding = 5; // Espacio entre palabras
-  // Removed showTooltip prop
-  export let enableTransitions = true; // Permitir deshabilitar animaciones para mejor rendimiento
-  export let adaptiveColors = true; // Colores que se ajustan al tamaño/importancia
-  export let enableShadows = true; // Permite deshabilitar sombras para mejor rendimiento
-  export let scaleOnHover = false; // Deshabilitar el escalado en hover por defecto
-  export let showBorder = true; // Mostrar borde decorativo
-  export let showLegend = false; // Mostrar leyenda de colores
-  export let showStatistics = false; // Mostrar estadísticas básicas
+  export let padding = 8; // Aumentado el espacio entre palabras
+  export let enableTransitions = true; 
+  export let adaptiveColors = true; 
+  export let enableShadows = true; 
+  export let scaleOnHover = false;
+  export let showBorder = true; 
+  export let showLegend = false; 
+  export let showStatistics = false; 
+  export let maxOverlapIterations = 200; // Nueva opción para controlar iteraciones anti-solapamiento
 
   // Referencias y variables
   let svgElement;
   let containerElement;
-  // Removed tooltipElement
   let dimensions = { width: 600, height: 600 };
-  // Removed hoveredWord
-  // Removed tooltipVisible
-  // Removed tooltipX and tooltipY
   const dispatch = createEventDispatcher();
   
   $: displayWords = words.length > 0 ? words : [];
-  
   $: sizeRange = calculateSizeRange(displayWords, dimensions);
-  
   $: actualColorScheme = highContrastMode 
     ? ["#000000", "#FFFFFF", "#FF0000", "#0000FF", "#FFFF00"] 
     : colorScheme;
@@ -59,14 +51,19 @@
     
     const area = dims.width * dims.height;
     const wordCount = words.length;
-    const estimatedDensity = Math.sqrt(area / wordCount) * 0.8;
-    const minSize = Math.max(12, estimatedDensity * 0.2);
-    const maxSize = Math.min(fontSizeScale, estimatedDensity);
+    
+    // Ajustar densidad basada en la cantidad de palabras
+    let densityFactor = 1;
+    if (wordCount > 50) densityFactor = 0.9;
+    if (wordCount > 100) densityFactor = 0.8;
+    if (wordCount > 200) densityFactor = 0.7;
+    
+    const estimatedDensity = Math.sqrt(area / wordCount) * 0.7 * densityFactor;
+    const minSize = Math.max(10, estimatedDensity * 0.18);
+    const maxSize = Math.min(fontSizeScale, estimatedDensity * 0.9);
     
     return [minSize, maxSize];
   }
-
-  // Removed handleGlobalMouseMove function
 
   onMount(() => {
     updateDimensions();
@@ -78,7 +75,6 @@
     if (containerElement) {
       resizeObserver.observe(containerElement);
     }
-    // Removed mousemove event listener
     
     renderWordCloud();
     window.addEventListener('resize', updateDimensions);
@@ -89,9 +85,9 @@
       }
       resizeObserver.disconnect();
       window.removeEventListener('resize', updateDimensions);
-      // Removed mousemove event listener cleanup
     };
   });
+  
   $: if (
     svgElement &&
     displayWords.length > 0 &&
@@ -131,6 +127,7 @@
       .attr("height", dimensions.height)
       .attr("viewBox", `0 0 ${dimensions.width} ${dimensions.height}`)
       .style("background", backgroundColor);
+    
     const defs = svg.append("defs");
     const gradient = defs.append("linearGradient")
       .attr("id", "word-highlight-gradient")
@@ -148,8 +145,6 @@
       .attr("offset", "100%")
       .attr("stop-color", d3.color(highlightColor).brighter(0.5))
       .attr("stop-opacity", 1);
-
-    // Removed tooltip header/footer SVG element
 
     const container = svg
       .append("g")
@@ -191,19 +186,31 @@
       
       return baseColor.toString();
     };
+    
     const visualizationArea = Math.min(dimensions.width, dimensions.height);
-    const scaleFactor = visualizationArea / 180;
-    let sortedWords = [...displayWords].sort((a, b) => b.value - a.value);
+    const scaleFactor = visualizationArea / 200; // Ajustado para mejor escalabilidad
+    
+    // Limitar el número de palabras si hay demasiadas para evitar sobrecarga visual
+    let maxWordsToShow = displayWords.length;
+    if (displayWords.length > 200) {
+      maxWordsToShow = 200;
+      console.warn(`Limitando a ${maxWordsToShow} palabras para mejor rendimiento`);
+    }
+    
+    let sortedWords = [...displayWords]
+      .sort((a, b) => b.value - a.value)
+      .slice(0, maxWordsToShow);
+      
     sortedWords = sortedWords.map((d, i) => ({
       ...d,
-      index: i, // Preservar orden original
-      fontSize: 0, // Inicializar con 0 para animación
+      index: i,
+      fontSize: 0,
       originalValue: d.originalValue !== undefined ? d.originalValue : d.value
     }));
 
     const fontSizeScale = d3
       .scalePow()
-      .exponent(0.8) // Mejor escala visual para palabras grandes/pequeñas
+      .exponent(0.7) // Mejor distribución de tamaños
       .domain([
         Math.max(1, d3.min(sortedWords, (d) => d.value) || 1), 
         d3.max(sortedWords, (d) => d.value) || 100
@@ -217,20 +224,32 @@
       .range([fontWeightMin, fontWeightMax])
       .clamp(true);
 
+    // Calcular tamaños de texto para mejor distribución
+    sortedWords.forEach(word => {
+      word.fontSize = fontSizeScale(word.value);
+    });
+
     function calculatePosition(d, i) {
       if (useGrid) {
         const gridSize = Math.ceil(Math.sqrt(sortedWords.length));
-        const x = ((i % gridSize) - gridSize / 2) * (dimensions.width / gridSize / 1.5);
-        const y = (Math.floor(i / gridSize) - gridSize / 2) * (dimensions.height / gridSize / 1.8);
+        const x = ((i % gridSize) - gridSize / 2) * (dimensions.width / gridSize / 1.3);
+        const y = (Math.floor(i / gridSize) - gridSize / 2) * (dimensions.height / gridSize / 1.5);
         return { x, y };
       } else {
-        const phi = (1 + Math.sqrt(5)) / 2; // Número áureo para mejor distribución
-        const angle = i * phi * Math.PI * 2; // Rotación basada en proporción áurea
-        const radiusGrowthFactor = Math.min(dimensions.width, dimensions.height) / 800;
-        const radius = (0.8 + Math.sqrt(i) * 0.35) * scaleFactor * radiusGrowthFactor * (visualizationArea / 400);
-        const distributionFactor = Math.min(1, i / (sortedWords.length * 0.8));
-        const x = radius * Math.cos(angle) * (1 + distributionFactor * 0.2);
-        const y = radius * Math.sin(angle) * (1 + distributionFactor * 0.2);
+        // Distribución Fibonacci para mejor espaciado
+        const phi = (1 + Math.sqrt(5)) / 2;
+        const angle = i * phi * Math.PI * 2;
+        
+        // Ajustar radio basado en cantidad de palabras
+        const wordCountFactor = Math.min(1, 50 / sortedWords.length);
+        const radiusBase = (0.5 + Math.sqrt(i) * 0.4) * scaleFactor * visualizationArea / 350;
+        
+        // Palabras más importantes más cerca del centro
+        const importanceFactor = 1 - (d.value / (d3.max(sortedWords, w => w.value) || 1)) * 0.3;
+        const radius = radiusBase * importanceFactor * (1 + wordCountFactor);
+        
+        const x = radius * Math.cos(angle);
+        const y = radius * Math.sin(angle);
         
         return { x, y };
       }
@@ -254,13 +273,8 @@
           return d3.select(this).attr("transform");
         });
       
-      // Removed tooltip code
-      
       dispatch("wordHover", { word: d.text, value: d.originalValue || d.value });
     }
-
-    // Removed tooltipText, tooltipVisible, tooltipX, tooltipY variables
-    // Removed hideTooltip function
     
     function handleMouseOut(event, d) {
       d3.select(this)
@@ -272,8 +286,6 @@
           const originalTransform = `translate(${d.x},${d.y}) rotate(${d.rotation || 0})`;
           return originalTransform;
         });
-        
-      // Removed tooltip code
     }
 
     const texts = container
@@ -308,64 +320,148 @@
         dispatch("wordClick", { word: d.text, value: d.originalValue || d.value });
       });
 
-    texts
-      .transition()
-      .delay((d, i) => enableTransitions ? i * (animationDuration / sortedWords.length / 2) : 0)
-      .duration(enableTransitions ? animationDuration / 2 : 0)
-      .style("opacity", 1)
-      .style("font-size", d => `${fontSizeScale(d.value)}px`);
+    // Calcular el tamaño aproximado de cada elemento de texto para colisiones
+    sortedWords.forEach(word => {
+      const textElement = container.select(`text[data-word="${word.text}"]`).node();
+      if (textElement) {
+        const bbox = textElement.getBBox();
+        word.width = bbox.width;
+        word.height = bbox.height;
+      } else {
+        // Estimación si no podemos obtener el tamaño real
+        word.width = word.text.length * (word.fontSize * 0.6);
+        word.height = word.fontSize * 1.2;
+      }
+    });
 
+    // Mejorar la simulación para evitar solapamientos
     simulation = d3
       .forceSimulation(sortedWords)
-      .force("center", d3.forceCenter(0, 0).strength(0.03)) // Fuerza central muy suave
+      .force("center", d3.forceCenter(0, 0).strength(0.01)) // Reducir fuerza central
       .force(
         "collide",
         d3.forceCollide().radius(d => {
-          return fontSizeScale(d.value) * (0.8 + padding / 10);
-        }).strength(0.85).iterations(3) // Mayor fuerza de colisión y más iteraciones para mejor separación
+          // Radio más grande para evitar solapamientos
+          return (d.width + d.height) * 0.28 + padding;
+        }).strength(0.98).iterations(6) // Fuerza muy alta y más iteraciones
       )
       .force("radial", d3.forceRadial(
         d => {
           const normalizedValue = d.value / d3.max(sortedWords, w => w.value);
           const baseRadius = Math.min(dimensions.width, dimensions.height) * 0.35;
-          return baseRadius * (0.2 + (1 - normalizedValue) * 0.8);
+          return baseRadius * (0.1 + (1 - normalizedValue) * 0.7) - (d.width + d.height) * 0.25;
         }, 
         0, 0
-      ).strength(0.08)) // Fuerza suave pero efectiva
-      .force("x", d3.forceX(d => d.x * 0.6).strength(0.02)) // Mantener cerca de posición inicial
-      .force("y", d3.forceY(d => d.y * 0.6).strength(0.02)) // Mantener cerca de posición inicial
-      .force("y-border-top", d3.forceY(dimensions.height * 0.1).strength(d => {
-        return d.y < -dimensions.height * 0.35 ? 0.1 : 0;
-      }))
+      ).strength(0.18)) // Fuerza radial ajustada
+      .force("x", d3.forceX(d => d.x * 0.2).strength(0.01)) // Mantener posición inicial suavemente
+      .force("y", d3.forceY(d => d.y * 1).strength(0.01))
       .stop();
       
-    for (let i = 0; i < 500; i++) {
+    // Más iteraciones para resolver la simulación
+    for (let i = 0; i < 900; i++) {
       simulation.tick();
-      if (i % 50 === 0) {
-        sortedWords.forEach(word => {
-          const maxDistance = Math.min(dimensions.width, dimensions.height) * 0.4;
-          const distanceFromCenter = Math.sqrt(word.x * word.x + word.y * word.y);
+      
+      // Verificar y ajustar posiciones en cada iteración, no solo periódicamente
+      sortedWords.forEach(word => {
+        // Calcular el radio máximo teniendo en cuenta el tamaño de la palabra
+        // para evitar que se salga de los bordes
+        const maxDistance = Math.min(dimensions.width, dimensions.height) * 0.45 - 
+                          Math.max(word.width, word.height) / 3;
+        
+        const distanceFromCenter = Math.sqrt(word.x * word.x + word.y * word.y);
+        
+        if (distanceFromCenter > maxDistance) {
+          const factor = maxDistance / distanceFromCenter;
+          word.x *= factor;
+          word.y *= factor;
+        }
+      });
+    }
+
+    // Algoritmo adicional para resolver solapamientos persistentes
+    function wordsOverlap(a, b) {
+      const dx = Math.abs(a.x - b.x);
+      const dy = Math.abs(a.y - b.y);
+      const widthOverlap = (a.width + b.width) * 0.4; // Factor de tolerancia
+      const heightOverlap = (a.height + b.height) * 0.8; // Factor de tolerancia
+      
+      return dx < widthOverlap && dy < heightOverlap;
+    }
+    
+    // Verificación manual anti-solapamiento
+    let iterations = 0;
+    let overlapFound = true;
+    
+    while (overlapFound && iterations < maxOverlapIterations) {
+      overlapFound = false;
+      iterations++;
+      
+      for (let i = 0; i < sortedWords.length; i++) {
+        const wordA = sortedWords[i];
+        
+        for (let j = i + 1; j < sortedWords.length; j++) {
+          const wordB = sortedWords[j];
           
-          if (distanceFromCenter > maxDistance) {
-            const factor = maxDistance / distanceFromCenter;
-            word.x *= factor * 0.9;
-            word.y *= factor * 0.9;
+          if (wordsOverlap(wordA, wordB)) {
+            overlapFound = true;
+            
+            // Calcular vector entre palabras
+            const dx = wordB.x - wordA.x || 0.1; // Evitar división por cero
+            const dy = wordB.y - wordA.y || 0.1;
+            const distance = Math.sqrt(dx * dx + dy * dy) || 0.1;
+            
+            // Determinar cuánto mover cada palabra
+            const minDistance = (wordA.width + wordB.width + wordA.height + wordB.height) * 0.25 + padding;
+            const moveAmount = (minDistance - distance + 2) / 2; // +2 para un poco de margen extra
+            
+            // Ajustar palabras en dirección opuesta
+            const moveX = (dx / distance) * moveAmount;
+            const moveY = (dy / distance) * moveAmount;
+            
+            // Palabra más pequeña se mueve más
+            const totalWeight = wordA.value + wordB.value;
+            const weightFactorA = wordB.value / totalWeight;
+            const weightFactorB = wordA.value / totalWeight;
+            
+            wordA.x -= moveX * weightFactorA * 1.2;
+            wordA.y -= moveY * weightFactorA * 1.2;
+            wordB.x += moveX * weightFactorB * 1.2;
+            wordB.y += moveY * weightFactorB * 1.2;
+            
+            // Mantener dentro de límites
+            const maxRadius = Math.min(dimensions.width, dimensions.height) * 0.48;
+            [wordA, wordB].forEach(word => {
+              const maxX = Math.min(dimensions.width, dimensions.height) * 0.7 - word.width / 2;
+              const maxY = Math.min(dimensions.width, dimensions.height) * 0.45 - word.height / 2;
+              
+              // Mantener dentro de los límites X
+              if (Math.abs(word.x) > maxX) {
+                word.x = Math.sign(word.x) * maxX;
+              }
+              
+              // Mantener dentro de los límites Y
+              if (Math.abs(word.y) > maxY) {
+                word.y = Math.sign(word.y) * maxY;
+              }
+            });
           }
-          if (word.y < -dimensions.height * 0.3) {
-            word.y *= 0.85; // Empujar más hacia el centro
-          }
-        });
+        }
       }
     }
 
+    // Actualizar posiciones de texto
     texts
       .attr("transform", d => {
-        const xLimit = dimensions.width * 0.45;
-        const yLimit = dimensions.height * 0.45;
-        d.x = Math.max(-xLimit, Math.min(xLimit, d.x || 0));
-        d.y = Math.max(-yLimit, Math.min(yLimit, d.y || 0));
         return `translate(${d.x},${d.y}) rotate(${d.rotation || 0})`;
       });
+
+    // Animación de entrada
+    texts
+      .transition()
+      .delay((d, i) => enableTransitions ? i * (animationDuration / sortedWords.length / 2) : 0)
+      .duration(enableTransitions ? animationDuration / 2 : 0)
+      .style("opacity", 1)
+      .style("font-size", d => `${d.fontSize}px`);
       
     if (showBorder) {
       svg.append("rect")
@@ -511,7 +607,7 @@
   }
   
   .wordcloud-header {
-    padding: 10px 15px;
+    padding: 5px 10px;
     text-align: center;
   }
   
@@ -532,8 +628,6 @@
   .wordcloud {
     display: block;
   }
-  
-  /* Removed all tooltip-related CSS */
   
   :global(.wordcloud-word) {
     transition: opacity 0.2s ease-out;

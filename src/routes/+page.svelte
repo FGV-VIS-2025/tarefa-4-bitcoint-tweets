@@ -54,7 +54,7 @@
     
     normalizedWords.sort((a, b) => b.originalValue - a.originalValue);
     
-    return normalizedWords.slice(0, 30);
+    return normalizedWords.slice(0, 28);
   }
 
   $: {
