@@ -16,6 +16,7 @@
   // State to store search parameters from child component
   let searchQuery = "";
   let searchFilterType = "";
+  let sliceLimit = 30;
 
   function processWordCloudData(data) {
     const wordCounts = {};
@@ -54,7 +55,7 @@
     
     normalizedWords.sort((a, b) => b.originalValue - a.originalValue);
     
-    return normalizedWords.slice(0, 28);
+    return normalizedWords.slice(0, sliceLimit);
   }
 
   $: {
@@ -155,6 +156,7 @@
           animationDuration={1500}
           fontFamily="'Montserrat', sans-serif"
           enableExport={true}
+          sliceLimit={sliceLimit}
         />
       </div>
       <div class="pt-4"/>

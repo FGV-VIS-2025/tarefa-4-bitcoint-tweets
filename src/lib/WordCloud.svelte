@@ -3,28 +3,29 @@
   import * as d3 from "d3";
 
   // Props
+  export let sliceLimit = 35;
   export let words = [];
-  export let title = "Analysis of tweet sentences by keyword"; 
+  export let title = `Top ${sliceLimit} Most Frequent Tweet Keywords`;
   export let fontSizeScale = 30;
   export let colorScheme = d3.schemeCategory10;
   export let fontFamily = "'Montserrat', 'Helvetica Neue', Arial, sans-serif";
   export let animationDuration = 1200;
   export let highlightColor = "#ff6600";
   export let backgroundColor = "transparent";
-  
+
   // Opciones avanzadas
   export let fontWeightMin = 300;
   export let fontWeightMax = 700;
   export let highContrastMode = false; // Para accesibilidad
   export let useGrid = false; // Distribuir en grid en lugar de espiral
   export let padding = 8; // Aumentado el espacio entre palabras
-  export let enableTransitions = true; 
-  export let adaptiveColors = true; 
-  export let enableShadows = true; 
+  export let enableTransitions = true;
+  export let adaptiveColors = true;
+  export let enableShadows = true;
   export let scaleOnHover = false;
-  export let showBorder = true; 
-  export let showLegend = false; 
-  export let showStatistics = false; 
+  export let showBorder = true;
+  export let showLegend = false;
+  export let showStatistics = false;
   export let maxOverlapIterations = 200; // Nueva opción para controlar iteraciones anti-solapamiento
 
   // Referencias y variables
@@ -32,11 +33,11 @@
   let containerElement;
   let dimensions = { width: 600, height: 600 };
   const dispatch = createEventDispatcher();
-  
+
   $: displayWords = words.length > 0 ? words : [];
   $: sizeRange = calculateSizeRange(displayWords, dimensions);
-  $: actualColorScheme = highContrastMode 
-    ? ["#000000", "#FFFFFF", "#FF0000", "#0000FF", "#FFFF00"] 
+  $: actualColorScheme = highContrastMode
+    ? ["#000000", "#FFFFFF", "#FF0000", "#0000FF", "#FFFF00"]
     : colorScheme;
 
   const updateDimensions = () => {
@@ -45,23 +46,23 @@
       dimensions = { width: Math.max(300, width), height: Math.max(300, height) };
     }
   };
-  
+
   function calculateSizeRange(words, dims) {
     if (!words || words.length === 0) return [14, fontSizeScale];
-    
+
     const area = dims.width * dims.height;
     const wordCount = words.length;
-    
+
     // Ajustar densidad basada en la cantidad de palabras
     let densityFactor = 1;
     if (wordCount > 50) densityFactor = 0.9;
     if (wordCount > 100) densityFactor = 0.8;
     if (wordCount > 200) densityFactor = 0.7;
-    
+
     const estimatedDensity = Math.sqrt(area / wordCount) * 0.7 * densityFactor;
     const minSize = Math.max(10, estimatedDensity * 0.18);
     const maxSize = Math.min(fontSizeScale, estimatedDensity * 0.9);
-    
+
     return [minSize, maxSize];
   }
 
@@ -71,11 +72,11 @@
       updateDimensions();
       renderWordCloud();
     });
-    
+
     if (containerElement) {
       resizeObserver.observe(containerElement);
     }
-    
+
     renderWordCloud();
     window.addEventListener('resize', updateDimensions);
 
@@ -87,7 +88,7 @@
       window.removeEventListener('resize', updateDimensions);
     };
   });
-  
+
   $: if (
     svgElement &&
     displayWords.length > 0 &&
@@ -101,7 +102,7 @@
 
   function calculateStatistics(words) {
     if (!words || words.length === 0) return null;
-    
+
     return {
       count: words.length,
       maxFrequency: d3.max(words, d => d.value),
@@ -127,7 +128,7 @@
       .attr("height", dimensions.height)
       .attr("viewBox", `0 0 ${dimensions.width} ${dimensions.height}`)
       .style("background", backgroundColor);
-    
+
     const defs = svg.append("defs");
     const gradient = defs.append("linearGradient")
       .attr("id", "word-highlight-gradient")
@@ -135,12 +136,12 @@
       .attr("y1", "0%")
       .attr("x2", "100%")
       .attr("y2", "100%");
-      
+
     gradient.append("stop")
       .attr("offset", "0%")
       .attr("stop-color", highlightColor)
       .attr("stop-opacity", 1);
-      
+
     gradient.append("stop")
       .attr("offset", "100%")
       .attr("stop-color", d3.color(highlightColor).brighter(0.5))
@@ -164,7 +165,7 @@
         .attr("dy", 1)
         .attr("stdDeviation", 2)
         .attr("flood-opacity", 0.3);
-        
+
       defs.append("filter")
         .attr("id", "hover-shadow")
         .attr("width", "130%")
@@ -183,24 +184,24 @@
       const baseColor = d3.hsl(baseColorScale(i % actualColorScheme.length));
       baseColor.s = Math.min(1, baseColor.s + normalizedValue * 0.3);
       baseColor.l = Math.max(0.3, Math.min(0.7, baseColor.l - normalizedValue * 0.2));
-      
+
       return baseColor.toString();
     };
-    
+
     const visualizationArea = Math.min(dimensions.width, dimensions.height);
     const scaleFactor = visualizationArea / 200; // Ajustado para mejor escalabilidad
-    
+
     // Limitar el número de palabras si hay demasiadas para evitar sobrecarga visual
     let maxWordsToShow = displayWords.length;
     if (displayWords.length > 200) {
       maxWordsToShow = 200;
       console.warn(`Limitando a ${maxWordsToShow} palabras para mejor rendimiento`);
     }
-    
+
     let sortedWords = [...displayWords]
       .sort((a, b) => b.value - a.value)
       .slice(0, maxWordsToShow);
-      
+
     sortedWords = sortedWords.map((d, i) => ({
       ...d,
       index: i,
@@ -212,12 +213,12 @@
       .scalePow()
       .exponent(0.7) // Mejor distribución de tamaños
       .domain([
-        Math.max(1, d3.min(sortedWords, (d) => d.value) || 1), 
+        Math.max(1, d3.min(sortedWords, (d) => d.value) || 1),
         d3.max(sortedWords, (d) => d.value) || 100
       ])
       .range([sizeRange[0] * scaleFactor, sizeRange[1] * scaleFactor])
       .clamp(true);
-      
+
     const fontWeightScale = d3
       .scaleLinear()
       .domain([0, d3.max(sortedWords, d => d.value) || 100])
@@ -239,45 +240,50 @@
         // Distribución Fibonacci para mejor espaciado
         const phi = (1 + Math.sqrt(5)) / 2;
         const angle = i * phi * Math.PI * 2;
-        
+
         // Ajustar radio basado en cantidad de palabras
         const wordCountFactor = Math.min(1, 50 / sortedWords.length);
         const radiusBase = (0.5 + Math.sqrt(i) * 0.4) * scaleFactor * visualizationArea / 350;
-        
+
         // Palabras más importantes más cerca del centro
         const importanceFactor = 1 - (d.value / (d3.max(sortedWords, w => w.value) || 1)) * 0.3;
         const radius = radiusBase * importanceFactor * (1 + wordCountFactor);
-        
+
         const x = radius * Math.cos(angle);
         const y = radius * Math.sin(angle);
-        
+
         return { x, y };
       }
     }
 
     function handleMouseOver(event, d) {
-      d3.select(this)
+      const element = d3.select(this);
+      element
         .transition()
         .duration(enableTransitions ? 200 : 0)
         .style("fill", "url(#word-highlight-gradient)")
         .style("filter", enableShadows ? "url(#hover-shadow)" : "none")
         .attr("transform", function() {
           if (scaleOnHover) {
-            const currentTransform = d3.select(this).attr("transform");
+            const currentTransform = element.attr("transform");
             if (currentTransform && currentTransform.includes("translate")) {
               const translatePart = currentTransform.match(/translate\([^)]+\)/)[0];
               const rotatePart = currentTransform.match(/rotate\([^)]+\)/)?.[0] || "";
               return `${translatePart} ${rotatePart} scale(1.05)`;
             }
           }
-          return d3.select(this).attr("transform");
+          return element.attr("transform");
         });
-      
+
+      // Mover el elemento al final del contenedor para que esté encima de los otros
+      element.raise();
+
       dispatch("wordHover", { word: d.text, value: d.originalValue || d.value });
     }
-    
+
     function handleMouseOut(event, d) {
-      d3.select(this)
+      const element = d3.select(this);
+      element
         .transition()
         .duration(enableTransitions ? 200 : 0)
         .style("fill", getColor(d, d.index))
@@ -350,26 +356,26 @@
           const normalizedValue = d.value / d3.max(sortedWords, w => w.value);
           const baseRadius = Math.min(dimensions.width, dimensions.height) * 0.35;
           return baseRadius * (0.1 + (1 - normalizedValue) * 0.7) - (d.width + d.height) * 0.25;
-        }, 
+        },
         0, 0
       ).strength(0.18)) // Fuerza radial ajustada
       .force("x", d3.forceX(d => d.x * 0.2).strength(0.01)) // Mantener posición inicial suavemente
       .force("y", d3.forceY(d => d.y * 1).strength(0.01))
       .stop();
-      
+
     // Más iteraciones para resolver la simulación
     for (let i = 0; i < 900; i++) {
       simulation.tick();
-      
+
       // Verificar y ajustar posiciones en cada iteración, no solo periódicamente
       sortedWords.forEach(word => {
         // Calcular el radio máximo teniendo en cuenta el tamaño de la palabra
         // para evitar que se salga de los bordes
-        const maxDistance = Math.min(dimensions.width, dimensions.height) * 0.45 - 
+        const maxDistance = Math.min(dimensions.width, dimensions.height) * 0.45 -
                           Math.max(word.width, word.height) / 3;
-        
+
         const distanceFromCenter = Math.sqrt(word.x * word.x + word.y * word.y);
-        
+
         if (distanceFromCenter > maxDistance) {
           const factor = maxDistance / distanceFromCenter;
           word.x *= factor;
@@ -384,61 +390,61 @@
       const dy = Math.abs(a.y - b.y);
       const widthOverlap = (a.width + b.width) * 0.4; // Factor de tolerancia
       const heightOverlap = (a.height + b.height) * 0.8; // Factor de tolerancia
-      
+
       return dx < widthOverlap && dy < heightOverlap;
     }
-    
+
     // Verificación manual anti-solapamiento
     let iterations = 0;
     let overlapFound = true;
-    
+
     while (overlapFound && iterations < maxOverlapIterations) {
       overlapFound = false;
       iterations++;
-      
+
       for (let i = 0; i < sortedWords.length; i++) {
         const wordA = sortedWords[i];
-        
+
         for (let j = i + 1; j < sortedWords.length; j++) {
           const wordB = sortedWords[j];
-          
+
           if (wordsOverlap(wordA, wordB)) {
             overlapFound = true;
-            
+
             // Calcular vector entre palabras
             const dx = wordB.x - wordA.x || 0.1; // Evitar división por cero
             const dy = wordB.y - wordA.y || 0.1;
             const distance = Math.sqrt(dx * dx + dy * dy) || 0.1;
-            
+
             // Determinar cuánto mover cada palabra
             const minDistance = (wordA.width + wordB.width + wordA.height + wordB.height) * 0.25 + padding;
             const moveAmount = (minDistance - distance + 2) / 2; // +2 para un poco de margen extra
-            
+
             // Ajustar palabras en dirección opuesta
             const moveX = (dx / distance) * moveAmount;
             const moveY = (dy / distance) * moveAmount;
-            
+
             // Palabra más pequeña se mueve más
             const totalWeight = wordA.value + wordB.value;
             const weightFactorA = wordB.value / totalWeight;
             const weightFactorB = wordA.value / totalWeight;
-            
+
             wordA.x -= moveX * weightFactorA * 1.2;
             wordA.y -= moveY * weightFactorA * 1.2;
             wordB.x += moveX * weightFactorB * 1.2;
             wordB.y += moveY * weightFactorB * 1.2;
-            
+
             // Mantener dentro de límites
             const maxRadius = Math.min(dimensions.width, dimensions.height) * 0.48;
             [wordA, wordB].forEach(word => {
               const maxX = Math.min(dimensions.width, dimensions.height) * 0.7 - word.width / 2;
               const maxY = Math.min(dimensions.width, dimensions.height) * 0.45 - word.height / 2;
-              
+
               // Mantener dentro de los límites X
               if (Math.abs(word.x) > maxX) {
                 word.x = Math.sign(word.x) * maxX;
               }
-              
+
               // Mantener dentro de los límites Y
               if (Math.abs(word.y) > maxY) {
                 word.y = Math.sign(word.y) * maxY;
@@ -462,7 +468,7 @@
       .duration(enableTransitions ? animationDuration / 2 : 0)
       .style("opacity", 1)
       .style("font-size", d => `${d.fontSize}px`);
-      
+
     if (showBorder) {
       svg.append("rect")
         .attr("x", 2)
@@ -476,34 +482,34 @@
         .attr("stroke-width", 1)
         .attr("stroke-opacity", 0.3);
     }
-    
+
     if (showLegend) {
       const legendHeight = 30;
       const legendPadding = 10;
       const legend = svg.append("g")
         .attr("class", "wordcloud-legend")
         .attr("transform", `translate(${legendPadding}, ${dimensions.height - legendHeight - legendPadding})`);
-      
+
       const minValue = d3.min(sortedWords, d => d.value);
       const maxValue = d3.max(sortedWords, d => d.value);
       const valueRange = maxValue - minValue;
       const legendSegments = 5;
-      
+
       const legendScale = d3.scaleLinear()
         .domain([0, legendSegments - 1])
         .range([minValue, maxValue]);
-      
+
       for (let i = 0; i < legendSegments; i++) {
         const segmentWidth = (dimensions.width - 2 * legendPadding) / legendSegments;
         const legendValue = Math.round(legendScale(i));
-        
+
         legend.append("rect")
           .attr("x", i * segmentWidth)
           .attr("y", 0)
           .attr("width", 15)
           .attr("height", 15)
           .attr("fill", getColor({value: legendValue}, i % actualColorScheme.length));
-        
+
         legend.append("text")
           .attr("x", i * segmentWidth + 20)
           .attr("y", 12)
@@ -516,7 +522,7 @@
           });
       }
     }
-    
+
     if (showStatistics) {
       const stats = calculateStatistics(sortedWords);
       if (stats) {
@@ -544,7 +550,7 @@
           {label: "Mín. frecuencia:", value: stats.minFrequency},
           {label: "Media:", value: stats.avgFrequency}
         ];
-        
+
         statData.forEach((stat, i) => {
           statsBox.append("text")
             .attr("x", 5)
@@ -559,16 +565,16 @@
 
   export function highlightWord(wordText) {
     if (!svgElement) return;
-    
+
     const wordElement = d3.select(svgElement)
       .select(`text[data-word="${wordText}"]`);
-      
+
     if (!wordElement.empty()) {
       const wordData = wordElement.datum();
       wordElement.node().__on[0].value.call(wordElement.node(), null, wordData);
     }
   }
-  
+
   export function exportAsSVG() {
     if (!svgElement) return null;
     const svgCopy = svgElement.cloneNode(true);
@@ -576,7 +582,7 @@
     const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
     return URL.createObjectURL(svgBlob);
   }
-  
+
   export function getStatistics() {
     return calculateStatistics(displayWords);
   }
@@ -588,7 +594,7 @@
       <h2 class="wordcloud-title">{title}</h2>
     </div>
   {/if}
-  
+
   <div
     bind:this={containerElement}
     class="wordcloud-container"
@@ -605,16 +611,16 @@
     display: flex;
     flex-direction: column;
   }
-  
+
   .wordcloud-header {
     padding: 5px 10px;
     text-align: center;
   }
-  
+
   .wordcloud-title {
     margin: 0 0 5px 0;
-    font-size: 1.5rem;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 800;
     color: #333;
   }
 
@@ -628,12 +634,17 @@
   .wordcloud {
     display: block;
   }
-  
+
   :global(.wordcloud-word) {
     transition: opacity 0.2s ease-out;
+    position: relative; /* Asegurar que z-index funcione */
   }
-  
+
   :global(.wordcloud-word:hover) {
     cursor: pointer;
+  }
+
+  :global(.highlight-group) {
+    pointer-events: all;
   }
 </style>
