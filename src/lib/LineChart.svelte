@@ -1,5 +1,4 @@
 <script lang="ts">
-  // Required imports
   import { onMount } from "svelte";
   import * as d3 from "d3";
 
@@ -14,7 +13,6 @@
     total: number;
   }
 
-  // Props
   export let filteredData: HashtagData[] = [];
   export let chartTitle: string = "Hashtag Trends by Month in 2022";
   export let xAxisLabel: string = "Months of the Year";
@@ -27,24 +25,19 @@
 
   $: data = filteredData.slice(0, 50);
 
-  // Generate a deterministic color for a hashtag using string hashing
   function hashStringToColor(str: string) {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       hash = str.charCodeAt(i) + ((hash << 5) - hash);
     }
-
     const h = Math.abs(hash % 360);
     const s = 70 + Math.abs((hash >> 8) % 30);
     const l = 35 + Math.abs((hash >> 16) % 30);
-
     return `hsl(${h}, ${s}%, ${l}%)`;
   }
 
-  // Calculate scales and domains
   $: scales = calculateScales(data, dimensions);
 
-  // Order of months for x-axis
   const monthOrder = [
     "January",
     "February",
@@ -60,7 +53,6 @@
     "December",
   ];
 
-  // Short month names for display
   const shortMonths = [
     "Jan",
     "Feb",
@@ -90,7 +82,6 @@
     const width = dims.width - margin.left - margin.right;
     const height = dims.height - margin.top - margin.bottom;
 
-    // Flatten months
     const allMonthPoints: MonthPoint[] = [];
     inputData.forEach((hashtag) => {
       hashtag.months.forEach((point) => {
@@ -98,20 +89,16 @@
       });
     });
 
-    // Create band scale
     const xScale = d3
       .scaleBand()
       .domain(monthOrder)
       .range([0, width])
       .padding(0.1);
 
-    // Find minimum count
     let minCount =
       d3.min(allMonthPoints, (d) => (d.count > 0 ? d.count : null)) || 1;
-    // Use a minimum threshold to avoid issues with very small values
     minCount = Math.max(0.1, minCount);
 
-    // Create logarithmic scale for y-axis
     const yScale = d3
       .scaleLog()
       .domain([minCount, d3.max(allMonthPoints, (d) => d.count) || 10])
@@ -135,7 +122,7 @@
         const xPos = scales.xScale(point.month) + scales.xScale.bandwidth() / 2;
         const yPos = scales.yScale(point.count);
         const distance = Math.sqrt(
-          Math.pow(xPos - mouseX, 2) + Math.pow(yPos - mouseY, 2),
+          Math.pow(xPos - mouseX, 2) + Math.pow(yPos - mouseY, 2)
         );
 
         if (distance < minDistance) {
@@ -163,10 +150,8 @@
     )
       return;
 
-    // Clear previous chart
     d3.select(chartElement).selectAll("*").remove();
 
-    // Create SVG container
     const svg = d3
       .select(chartElement)
       .attr("width", dimensions.width)
@@ -174,16 +159,14 @@
       .append("g")
       .attr(
         "transform",
-        `translate(${scales.margin.left},${scales.margin.top})`,
+        `translate(${scales.margin.left},${scales.margin.top})`
       );
 
-    // Add x-axis with month names
     svg
       .append("g")
       .attr("transform", `translate(0,${scales.height})`)
       .call(d3.axisBottom(scales.xScale).tickFormat((d, i) => shortMonths[i]));
 
-    // Add x-axis label
     svg
       .append("text")
       .attr("text-anchor", "middle")
@@ -192,19 +175,21 @@
       .style("font-size", "12px")
       .text(xAxisLabel);
 
-    // Add y-axis with logarithmic ticks
-    svg.append("g").call(
-      d3.axisLeft(scales.yScale).tickFormat((d) => {
-        if (d === 1 || d === 10 || d === 100 || d === 1000 || d === 10000) {
-          return d.toString();
-        } else if (d < 10) {
-          return d.toFixed(1);
-        }
-        return d.toFixed(0);
-      }),
-    );
+    const yAxis = d3
+      .axisLeft(scales.yScale)
+      .ticks(5, d3.format(",.0f"))
+      .tickFormat((d) => {
+        const value = d.valueOf();
+        if (value >= 10000) return d3.format(".0f")(value);
+        if (value >= 1000) return d3.format(",.0f")(value);
+        if (value >= 100) return d3.format(".0f")(value);
+        if (value >= 10) return d3.format(".1f")(value);
+        if (value >= 1) return value.toString();
+        return d3.format(".1f")(value);
+      });
 
-    // Add y-axis label
+    svg.append("g").call(yAxis);
+
     svg
       .append("text")
       .attr("text-anchor", "middle")
@@ -214,7 +199,6 @@
       .style("font-size", "12px")
       .text(yAxisLabel);
 
-    // Add chart title
     svg
       .append("text")
       .attr("text-anchor", "middle")
@@ -224,7 +208,6 @@
       .style("font-weight", "bold")
       .text(chartTitle);
 
-    // Create tooltip
     tooltip = d3
       .select(containerElement)
       .append("div")
@@ -239,7 +222,6 @@
       .style("font-size", "12px")
       .style("box-shadow", "0 4px 8px rgba(0,0,0,0.2)");
 
-    // Add interaction area for tooltip
     svg
       .append("rect")
       .attr("width", scales.width)
@@ -251,13 +233,19 @@
         const closestPoint = findClosestPoint(mouseX, mouseY);
 
         if (closestPoint) {
-          // Get the center of the band for this month
+          // Dim all lines and points
+          d3.selectAll(".line").style("opacity", 0.15);
+          d3.selectAll(".dot").style("opacity", 0.15);
+
+          // Highlight current line and points
+          d3.select(`.line-${closestPoint?.hashtag}`).style("opacity", 1);
+          d3.selectAll(`.dot-${closestPoint?.hashtag}`).style("opacity", 1);
+
           const xPos =
             scales.xScale(closestPoint.month) + scales.xScale.bandwidth() / 2;
           const yPos = scales.yScale(closestPoint.count);
           const hashtagColor = hashStringToColor(closestPoint.hashtag);
 
-          // Update tooltip content and position
           tooltip
             .style("opacity", 1)
             .style("left", `${event.offsetX + 15}px`)
@@ -269,7 +257,6 @@
                Month: ${closestPoint.month}<br/>
                Count: ${closestPoint.count}`);
 
-          // Add highlight circle
           svg.selectAll(".hover-circle").remove();
           svg
             .append("circle")
@@ -288,30 +275,25 @@
       .on("mouseleave", function () {
         tooltip.style("opacity", 0);
         svg.selectAll(".hover-circle").remove();
+        d3.selectAll(".line").style("opacity", 1);
+        d3.selectAll(".dot").style("opacity", 1);
       });
 
     const lineGenerator = (d) => {
       const validPoints = d.months.filter((p) => p.count > 0);
-
       validPoints.sort(
-        (a, b) => monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month),
+        (a, b) => monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month)
       );
-
-      // Map the data points to x,y coordinates
       const points = validPoints.map((p) => ({
         x: scales.xScale(p.month) + scales.xScale.bandwidth() / 2,
         y: scales.yScale(p.count),
       }));
-
       if (points.length < 2) return null;
-
-      // Create the smooth line path
       const linePath = d3
         .line<{ x: number; y: number }>()
         .x((d) => d.x)
         .y((d) => d.y)
         .curve(d3.curveCardinal.tension(0.5));
-
       return linePath(points);
     };
 
@@ -320,29 +302,28 @@
       .data(data)
       .join("path")
       .attr("fill", "none")
+      .attr("class", (d) => `line line-${d.hashtag}`)
       .attr("stroke", (d) => hashStringToColor(d.hashtag))
       .attr("stroke-width", 2)
       .attr("d", lineGenerator);
 
-    // Add data points
     data.forEach((hashtag) => {
       const validPoints = hashtag.months.filter((p) => p.count > 0);
 
       svg
-        .selectAll(`.dot-${hashtag.hashtag.replace(/[^a-zA-Z0-9]/g, "-")}`)
+        .selectAll(`.dot-${hashtag.hashtag}`)
         .data(validPoints)
         .join("circle")
-        .attr("class", `dot-${hashtag.hashtag.replace(/[^a-zA-Z0-9]/g, "-")}`)
+        .attr("class", `dot dot-${hashtag.hashtag}`)
         .attr(
           "cx",
-          (d) => scales.xScale(d.month) + scales.xScale.bandwidth() / 2,
+          (d) => scales.xScale(d.month) + scales.xScale.bandwidth() / 2
         )
         .attr("cy", (d) => scales.yScale(d.count))
         .attr("r", 3)
         .attr("fill", hashStringToColor(hashtag.hashtag));
     });
 
-    // Add legend
     const legend = svg
       .append("g")
       .attr("transform", `translate(${scales.width + 20}, 0)`);
@@ -367,7 +348,7 @@
           .text((d) =>
             d.hashtag.length > 15
               ? d.hashtag.substring(0, 15) + "..."
-              : d.hashtag,
+              : d.hashtag
           );
       });
 
@@ -380,7 +361,6 @@
         .text(`+ ${data.length - 10} more`);
     }
 
-    // Add faint grid lines
     svg
       .append("g")
       .attr("class", "grid y-grid")
@@ -388,7 +368,6 @@
       .style("stroke", "#e0e0e0")
       .style("stroke-opacity", 0.1);
 
-    // Add vertical grid lines for each month
     svg
       .append("g")
       .attr("class", "grid x-grid")
@@ -403,7 +382,6 @@
       .style("stroke-opacity", 0.1);
   }
 
-  // Update dimensions and recalculate chart when component mounts
   onMount(() => {
     if (containerElement) {
       const { width, height } = containerElement.getBoundingClientRect();
@@ -411,13 +389,11 @@
     }
   });
 
-  // Update chart when data or dimensions change
   $: if (data && dimensions.width > 0 && dimensions.height > 0) {
     if (tooltip) {
       tooltip.remove();
       tooltip = null;
     }
-
     updateChart();
   }
 </script>
