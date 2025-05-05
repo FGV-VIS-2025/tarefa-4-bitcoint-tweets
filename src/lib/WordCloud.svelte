@@ -591,7 +591,20 @@
 <div class="wordcloud-wrapper">
   {#if title}
     <div class="wordcloud-header">
-      <h2 class="wordcloud-title">{title}</h2>
+      <div class="title-with-tooltip">
+        <div class="tooltip-container">
+          <div class="info-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" width="18" height="18">
+              <path d="M22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12Z" stroke="#141B34" stroke-width="1.5" stroke-linejoin="round"/>
+              <path d="M10.0239 10.0107H12.0048V16.9917M11.2514 7.26758H12.7509" stroke="#141B34" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="tooltip-text">
+            CloudWorld displays the most frequently used words in tweets containing the hashtags shown in the Line Chart
+          </div>
+        </div>
+        <h2 class="wordcloud-title">{title}</h2>
+      </div>
     </div>
   {/if}
 
@@ -617,11 +630,64 @@
     text-align: center;
   }
 
+  .title-with-tooltip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    gap: 8px;
+  }
+
   .wordcloud-title {
-    margin: 0 0 5px 0;
+    margin: 0;
     font-size: 16px;
     font-weight: 800;
     color: #333;
+  }
+
+  .tooltip-container {
+    position: relative;
+    display: inline-block;
+  }
+
+  .info-icon {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+  }
+
+  .tooltip-text {
+    visibility: hidden;
+    position: absolute;
+    width: 250px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 8px;
+    z-index: 10;
+    top: -5px;
+    left: 125%;
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 12px;
+    font-weight: normal;
+  }
+
+  .tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 100%;
+    margin-top: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: transparent #333 transparent transparent;
+  }
+
+  .tooltip-container:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
   }
 
   .wordcloud-container {
@@ -637,7 +703,7 @@
 
   :global(.wordcloud-word) {
     transition: opacity 0.2s ease-out;
-    position: relative; /* Asegurar que z-index funcione */
+    position: relative;
   }
 
   :global(.wordcloud-word:hover) {
