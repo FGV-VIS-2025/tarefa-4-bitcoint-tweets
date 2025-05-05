@@ -26,25 +26,25 @@
 
   function getCountByDate(data: HashtagItem[]): CountByDateType[] {
     const countMap = new Map<string, number>();
-    
-    data.forEach(item => {
+
+    data.forEach((item) => {
       const { timeline } = item;
-      
+
       if (timeline) {
         const timelineItems = Array.isArray(timeline) ? timeline : [timeline];
-        
-        timelineItems.forEach(timeItem => {
+
+        timelineItems.forEach((timeItem) => {
           if (timeItem && timeItem.date) {
             const dateStr = timeItem.date;
             const count = timeItem.count || 0;
-            
+
             const currentCount = countMap.get(dateStr) || 0;
             countMap.set(dateStr, currentCount + count);
           }
         });
       }
     });
-    
+
     const result: CountByDateType[] = [];
     countMap.forEach((count, dateStr) => {
       const date = new Date(dateStr);
@@ -52,7 +52,7 @@
         result.push({ date, count });
       }
     });
-    
+
     return result;
   }
 
@@ -60,43 +60,71 @@
     if (!d3Container) return;
 
     d3.select(d3Container).selectAll("*").remove();
-    if (!data || data.length === 0) {
-      console.warn("No data available for the heatmap");
-      return;
-    }
-  
-    // Get container dimensions
-    const containerWidth = d3Container.clientWidth || 800;
-    const containerHeight = d3Container.clientHeight || 320;
 
-    // Set dimensions and margins
-    const cellSize = Math.floor(containerWidth / 55); // Adapt cell size to container width
+    const containerWidth = d3Container.clientWidth || 1200;
+    const containerHeight = d3Container.clientHeight || 400;
+
+    const firstDayOf2022 = new Date(2022, 0, 1);
+    const lastDayOf2022 = new Date(2022, 11, 31);
+    const startDayOfWeek = firstDayOf2022.getDay();
+    const endDayOfWeek = lastDayOf2022.getDay();
+
+    const startDate = new Date(firstDayOf2022);
+    startDate.setDate(startDate.getDate() - startDayOfWeek);
+
+    const endDate = new Date(lastDayOf2022);
+    endDate.setDate(endDate.getDate() + (6 - endDayOfWeek));
+
+    const diffInTime = endDate.getTime() - startDate.getTime();
+    const diffInDays = diffInTime / (1000 * 3600 * 24);
+    const numberOfWeeks = Math.ceil(diffInDays / 7);
+
+    const margin = { top: 40, right: 100, bottom: 30, left: 60 };
+
+    const legendWidth = 14;
+    const legendGap = 16;
+    const totalLegendSpace = legendWidth + legendGap + 60;
+
+    const availableWidth =
+      containerWidth - margin.left - margin.right - totalLegendSpace;
+    const availableHeight = containerHeight - margin.top - margin.bottom;
+
+    const cellSize = Math.min(
+      Math.floor(availableWidth / numberOfWeeks),
+      Math.floor(availableHeight / 8)
+    );
+
     const cellMargin = Math.max(1, Math.floor(cellSize / 6));
     const fullCellSize = cellSize + cellMargin;
 
-    const margin = { top: 40, right: 30, bottom: 50, left: 40 };
-
-    // Create color scale based on contribution count
     const maxCount = d3.max(data, (d) => d.count) || 10;
     const colorScale = d3
       .scaleSequential()
       .domain([0, maxCount])
       .interpolator(d3.interpolateGreens);
 
-    // Create SVG with responsive dimensions
+    const svgWidth = Math.max(
+      containerWidth,
+      numberOfWeeks * fullCellSize +
+        margin.left +
+        margin.right +
+        totalLegendSpace
+    );
+
     const svg = d3
       .select(d3Container)
       .append("svg")
-      .attr("width", containerWidth)
+      .attr("width", svgWidth)
       .attr("height", containerHeight)
-      .style("background-color", "#ffffff") // Light mode background
+      .style("background-color", "#ffffff");
+
+    const svgChart = svg
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // Add title
-    svg
+    svgChart
       .append("text")
-      .attr("x", (containerWidth - margin.left - margin.right) / 2)
+      .attr("x", availableWidth / 2)
       .attr("y", -20)
       .attr("text-anchor", "middle")
       .style("font-size", "20px")
@@ -104,36 +132,18 @@
       .style("fill", "#333333")
       .text(title);
 
-    // Get full date range
-    const dateExtent = d3.extent(data, (d) => d.date) as [Date, Date];
-    let startDate: Date, endDate: Date;
-
-    if (dateExtent[0] && dateExtent[1]) {
-      startDate = d3.timeWeek.floor(dateExtent[0]);
-      endDate = d3.timeWeek.ceil(dateExtent[1]);
-    } else {
-      // Fallback to one year of data
-      endDate = new Date();
-      startDate = new Date();
-      startDate.setFullYear(startDate.getFullYear() - 1);
-      startDate = d3.timeWeek.floor(startDate);
-      endDate = d3.timeWeek.ceil(endDate);
-    }
-
-    // Format months along the top
     const months = d3.timeMonths(
-      d3.timeMonth.floor(startDate),
-      d3.timeMonth.ceil(endDate)
+      new Date(2022, 0, 1),
+      new Date(2022, 11, 31)
     );
 
-    // Add month labels
-    svg
+    svgChart
       .selectAll(".month")
       .data(months)
       .enter()
       .append("text")
       .attr("class", "month")
-      .style("font-size", `${Math.max(9, cellSize * 0.45)}px`)
+      .style("font-size", `${Math.max(11, cellSize * 0.45)}px`)
       .style("fill", "#666666")
       .attr("x", (d) => {
         const firstDayOfMonth = d;
@@ -164,24 +174,23 @@
 
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-    svg
+    svgChart
       .selectAll(".day")
       .data(days)
       .enter()
       .append("text")
       .attr("class", "day")
-      .style("font-size", `${Math.max(9, cellSize * 0.35)}px`)
+      .style("font-size", `${Math.max(10, cellSize * 0.35)}px`)
       .style("font-weight", "500")
       .style("fill", "#666666")
       .attr("x", -25)
       .attr("y", (d, i) => i * fullCellSize + fullCellSize / 2 + 3)
-      .style("text-anchor", "start")
+      .style("text-anchor", "end")
       .text((d) => d);
 
-    // Create week groups
-    const weeks = svg
+    const weeks = svgChart
       .selectAll(".week")
-      .data(d3.range(0, 53))
+      .data(d3.range(0, numberOfWeeks))
       .enter()
       .append("g")
       .attr("class", "week")
@@ -194,19 +203,21 @@
           const cellDate = new Date(startDate);
           cellDate.setDate(cellDate.getDate() + weekNum * 7 + dayNum);
 
-          if (cellDate > endDate) {
-            return { date: cellDate, count: null };
+          let count = 0;
+          if (cellDate.getFullYear() === 2022) {
+            const matchingData = data.find(
+              (d) =>
+                d.date.getFullYear() === cellDate.getFullYear() &&
+                d.date.getMonth() === cellDate.getMonth() &&
+                d.date.getDate() === cellDate.getDate()
+            );
+            count = matchingData ? matchingData.count : 0;
           }
-          const matchingData = data.find(
-            (d) =>
-              d.date.getFullYear() === cellDate.getFullYear() &&
-              d.date.getMonth() === cellDate.getMonth() &&
-              d.date.getDate() === cellDate.getDate()
-          );
 
           return {
             date: cellDate,
-            count: matchingData ? matchingData.count : 0,
+            count: count,
+            isInYear: cellDate.getFullYear() === 2022,
           };
         });
       })
@@ -222,8 +233,8 @@
         return dayOfWeek * fullCellSize;
       })
       .attr("fill", (d) => {
-        if (d.count === null) return "transparent";
-        return d.count > 0 ? colorScale(d.count) : "#ebedf0";
+        if (!d.isInYear) return "#e8e8e8";
+        return colorScale(d.count);
       })
       .style("stroke", "#ffffff")
       .style("stroke-width", "1px")
@@ -239,24 +250,19 @@
         return `${d.count} tweets on ${dateStr}`;
       });
 
-    // Add legend
-    const legendWidth = 150;
-    const legendHeight = 15;
-    const legendX =
-      (containerWidth - margin.left - margin.right - legendWidth) / 2;
-    const legendY = containerHeight - margin.top - margin.bottom + 40;
+    const legendHeight = 160;
+    const legendX = numberOfWeeks * fullCellSize + legendGap;
+    const legendY = 10;
 
-    // Create gradient for legend
     const defs = svg.append("defs");
     const linearGradient = defs
       .append("linearGradient")
       .attr("id", "color-scale-gradient")
       .attr("x1", "0%")
-      .attr("y1", "0%")
-      .attr("x2", "100%")
+      .attr("y1", "100%")
+      .attr("x2", "0%")
       .attr("y2", "0%");
 
-    // Add color stops to gradient
     const stops = [0, 0.25, 0.5, 0.75, 1];
     stops.forEach((stop) => {
       linearGradient
@@ -265,8 +271,7 @@
         .attr("stop-color", colorScale(stop * maxCount));
     });
 
-    // Add gradient rectangle
-    svg
+    svgChart
       .append("rect")
       .attr("x", legendX)
       .attr("y", legendY)
@@ -276,39 +281,30 @@
       .style("stroke", "#ccc")
       .style("stroke-width", "0.5px");
 
-    // Add legend text
-    svg
+    svgChart
       .append("text")
-      .attr("x", legendX)
-      .attr("y", legendY - 5)
+      .attr("x", legendX + legendWidth + 5)
+      .attr("y", legendY + legendHeight + 4)
       .style("text-anchor", "start")
-      .style("font-size", "12px")
+      .style("font-size", "14px")
       .style("fill", "#666666")
-      .text(0);
+      .text("0");
 
-    svg
+    svgChart
       .append("text")
-      .attr("x", legendX + legendWidth)
-      .attr("y", legendY - 5)
-      .style("text-anchor", "end")
-      .style("font-size", "12px")
+      .attr("x", legendX + legendWidth + 5)
+      .attr("y", legendY + 4)
+      .style("text-anchor", "start")
+      .style("font-size", "14px")
       .style("fill", "#666666")
       .text(maxCount);
   }
 
-  $: if (d3Container && countByDate) {
-    createHeatMap(countByDate);
-  }
-
   onMount(() => {
-    setTimeout(() => {
-      if (d3Container && countByDate) {
-        createHeatMap(countByDate);
-      }
-    }, 50);
+    createHeatMap(countByDate);
 
     const handleResize = () => {
-      if (d3Container && countByDate) {
+      if (d3Container) {
         createHeatMap(countByDate);
       }
     };
@@ -317,6 +313,10 @@
       window.removeEventListener("resize", handleResize);
     };
   });
+
+  $: if (d3Container) {
+    createHeatMap(countByDate);
+  }
 </script>
 
 <div class="w-full h-full">
